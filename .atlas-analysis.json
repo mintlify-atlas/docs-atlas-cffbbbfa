@@ -1,0 +1,166 @@
+{
+  "projectType": "framework",
+  "projectName": "Upsonic",
+  "projectDescription": "Production-ready AI agent framework with safety policies, multi-agent coordination, and MCP tool integration",
+  "theme": "aspen",
+  "primaryColor": "#04d47d",
+  "lightColor": "#142c33",
+  "darkColor": null,
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "introduction",
+              "installation",
+              "quickstart"
+            ]
+          },
+          {
+            "group": "Core Concepts",
+            "pages": [
+              "concepts/agent",
+              "concepts/autonomous-agent",
+              "concepts/task",
+              "concepts/tools",
+              "concepts/memory",
+              "concepts/safety-engine",
+              "concepts/team",
+              "concepts/knowledge-base",
+              "concepts/ocr"
+            ]
+          },
+          {
+            "group": "Guides",
+            "pages": [
+              "guides/building-agents",
+              "guides/multi-agent-workflows",
+              "guides/custom-tools",
+              "guides/safety-policies",
+              "guides/memory-management",
+              "guides/rag-knowledge-base",
+              "guides/document-processing"
+            ]
+          },
+          {
+            "group": "Tools & Integration",
+            "pages": [
+              "tools/mcp-tools",
+              "tools/built-in-tools",
+              "tools/custom-tools",
+              "tools/storage-backends",
+              "tools/model-providers"
+            ]
+          },
+          {
+            "group": "Deployment",
+            "pages": [
+              "deployment/cli",
+              "deployment/interfaces",
+              "deployment/agentos"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "Core Classes",
+            "pages": [
+              "api/agent",
+              "api/autonomous-agent",
+              "api/task",
+              "api/team",
+              "api/knowledge-base"
+            ]
+          },
+          {
+            "group": "Safety Engine",
+            "pages": [
+              "api/safety-engine/policies",
+              "api/safety-engine/custom-policies"
+            ]
+          },
+          {
+            "group": "Storage",
+            "pages": [
+              "api/storage/memory",
+              "api/storage/backends"
+            ]
+          },
+          {
+            "group": "Tools",
+            "pages": [
+              "api/tools/base",
+              "api/tools/common-tools"
+            ]
+          },
+          {
+            "group": "OCR",
+            "pages": [
+              "api/ocr/ocr",
+              "api/ocr/engines"
+            ]
+          },
+          {
+            "group": "Models",
+            "pages": [
+              "api/models/providers",
+              "api/models/settings"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Autonomous agents with filesystem and shell access",
+    "Safety engine with policy-based content filtering",
+    "Multi-agent team coordination (sequential and parallel)",
+    "MCP tool integration and custom tool support",
+    "Memory management with multiple storage backends",
+    "Knowledge base and RAG with document processing",
+    "OCR support with multiple engines (EasyOCR, RapidOCR, Tesseract, PaddleOCR)",
+    "Multi-provider AI support (OpenAI, Anthropic, Azure, Bedrock, Google, etc.)",
+    "AgentOS deployment platform with Kubernetes runtime",
+    "CLI for project management and deployment"
+  ],
+  "publicApiSurface": [
+    "Agent",
+    "AutonomousAgent",
+    "Task",
+    "Team",
+    "KnowledgeBase",
+    "Graph",
+    "Chat",
+    "Direct",
+    "Simulation",
+    "RalphLoop",
+    "Memory",
+    "InMemoryStorage",
+    "JSONStorage",
+    "SQLiteStorage",
+    "RedisStorage",
+    "PostgreSQLStorage",
+    "MongoDBStorage",
+    "OCR",
+    "EasyOCREngine",
+    "RapidOCREngine",
+    "TesseractEngine",
+    "PaddleOCREngine",
+    "Tool",
+    "ToolManager",
+    "Policy",
+    "PIIAnonymizePolicy",
+    "upsonic init",
+    "upsonic add",
+    "upsonic remove",
+    "upsonic install",
+    "upsonic run",
+    "upsonic zip"
+  ]
+}
