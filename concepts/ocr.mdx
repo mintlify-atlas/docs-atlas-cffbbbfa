@@ -1,0 +1,448 @@
+---
+title: "OCR"
+description: "OCR engines for extracting text from images and PDFs"
+---
+
+## Overview
+
+The Upsonic OCR system provides a unified interface for extracting text from images and PDF documents using multiple OCR engines. It features automatic document conversion, configurable engines, timeout management, and detailed results with bounding boxes and confidence scores.
+
+## Key Features
+
+- **Multiple Engines**: EasyOCR, RapidOCR, PaddleOCR support
+- **Unified Interface**: Single API for all engines
+- **Document Conversion**: Automatic PDF to image conversion
+- **GPU Acceleration**: Optional GPU support for faster processing
+- **Timeout Management**: Per-page timeout control
+- **Detailed Results**: Text blocks with positions and confidence
+- **Async-First**: Async operations with sync wrappers
+- **Multi-Language**: Support for 80+ languages
+- **Metrics Tracking**: Processing statistics and performance monitoring
+
+## Basic Usage
+
+### Simple OCR
+
+```python
+from upsonic import OCR
+from upsonic.ocr.engines import EasyOCREngine
+
+# Create engine
+engine = EasyOCREngine(languages=['en'])
+
+# Create OCR orchestrator
+ocr = OCR(layer_1_ocr_engine=engine)
+
+# Extract text from image
+text = ocr.get_text("document.png")
+print(text)
+
+# Extract text from PDF
+text = ocr.get_text("document.pdf")
+print(text)
+```
+
+### Detailed Results
+
+```python
+# Get detailed OCR results
+result = ocr.process_file("document.pdf")
+
+print(f"Text: {result.text}")
+print(f"Confidence: {result.confidence:.2%}")
+print(f"Pages: {result.page_count}")
+print(f"Processing time: {result.processing_time_ms}ms")
+
+# Access text blocks with positions
+for block in result.blocks:
+    print(f"Text: {block.text}")
+    print(f"Confidence: {block.confidence}")
+    print(f"Position: {block.bbox}")
+    print(f"Page: {block.page_number}")
+```
+
+## OCR Engines
+
+### EasyOCR
+
+General-purpose OCR with good accuracy:
+
+```python
+from upsonic.ocr.engines import EasyOCREngine
+
+# CPU version
+engine = EasyOCREngine(
+    languages=['en', 'fr', 'de'],
+    gpu=False
+)
+
+# GPU version (faster)
+engine = EasyOCREngine(
+    languages=['en'],
+    gpu=True
+)
+
+ocr = OCR(layer_1_ocr_engine=engine)
+```
+
+### RapidOCR
+
+Fast and lightweight:
+
+```python
+from upsonic.ocr.engines import RapidOCREngine
+
+engine = RapidOCREngine(
+    languages=['en', 'ch']  # English and Chinese
+)
+
+ocr = OCR(layer_1_ocr_engine=engine)
+```
+
+### PaddleOCR
+
+High accuracy, especially for Asian languages:
+
+```python
+from upsonic.ocr.engines import PaddleOCREngine
+
+engine = PaddleOCREngine(
+    languages=['en', 'ch', 'ja'],
+    use_gpu=True
+)
+
+ocr = OCR(layer_1_ocr_engine=engine)
+```
+
+## Configuration
+
+### OCR Config
+
+```python
+from upsonic.ocr.engines import EasyOCREngine
+from upsonic.ocr.base import OCRConfig
+
+config = OCRConfig(
+    pdf_dpi=300,  # PDF rendering quality
+    batch_size=8,  # Batch size for processing
+    detail_level=1  # Detail level (0-2)
+)
+
+engine = EasyOCREngine(
+    languages=['en'],
+    gpu=True,
+    config=config
+)
+
+ocr = OCR(layer_1_ocr_engine=engine)
+```
+
+### Timeout Control
+
+```python
+# Set timeout per page
+ocr = OCR(
+    layer_1_ocr_engine=engine,
+    layer_1_timeout=30.0  # 30 seconds per page
+)
+
+try:
+    result = ocr.process_file("large_document.pdf")
+except OCRTimeoutError as e:
+    print(f"Timeout: {e}")
+```
+
+## Multi-Language Support
+
+### Multiple Languages
+
+```python
+# Process documents with multiple languages
+engine = EasyOCREngine(
+    languages=['en', 'fr', 'de', 'es', 'it']
+)
+
+ocr = OCR(layer_1_ocr_engine=engine)
+text = ocr.get_text("multilingual.pdf")
+```
+
+### Asian Languages
+
+```python
+# Chinese, Japanese, Korean
+engine = EasyOCREngine(
+    languages=['ch_sim', 'ja', 'ko']
+)
+
+ocr = OCR(layer_1_ocr_engine=engine)
+text = ocr.get_text("asian_doc.pdf")
+```
+
+### Arabic and RTL Languages
+
+```python
+engine = EasyOCREngine(
+    languages=['ar', 'he', 'fa']  # Arabic, Hebrew, Farsi
+)
+
+ocr = OCR(layer_1_ocr_engine=engine)
+text = ocr.get_text("rtl_document.pdf")
+```
+
+## Async Processing
+
+### Async Operations
+
+```python
+import asyncio
+
+async def process_documents():
+    engine = EasyOCREngine(languages=['en'])
+    ocr = OCR(layer_1_ocr_engine=engine)
+    
+    # Async text extraction
+    text = await ocr.get_text_async("document.pdf")
+    print(text)
+    
+    # Async detailed results
+    result = await ocr.process_file_async("document.pdf")
+    print(f"Pages: {result.page_count}")
+    print(f"Confidence: {result.confidence}")
+
+asyncio.run(process_documents())
+```
+
+### Batch Processing
+
+```python
+async def process_batch():
+    engine = EasyOCREngine(languages=['en'])
+    ocr = OCR(layer_1_ocr_engine=engine)
+    
+    files = ["doc1.pdf", "doc2.pdf", "doc3.pdf"]
+    
+    # Process all files concurrently
+    tasks = [ocr.process_file_async(f) for f in files]
+    results = await asyncio.gather(*tasks)
+    
+    for i, result in enumerate(results):
+        print(f"File {i+1}: {result.page_count} pages")
+
+asyncio.run(process_batch())
+```
+
+## Results and Metadata
+
+### OCR Result Object
+
+```python
+result = ocr.process_file("document.pdf")
+
+# Text content
+print(result.text)  # Extracted text
+
+# Confidence score
+print(result.confidence)  # Average confidence (0.0-1.0)
+
+# Document info
+print(result.page_count)  # Number of pages
+print(result.processing_time_ms)  # Processing time
+print(result.provider)  # OCR engine name
+
+# Metadata
+print(result.metadata)  # Dict with file info and config
+```
+
+### Text Blocks
+
+```python
+# Access individual text blocks
+for block in result.blocks:
+    print(f"Text: {block.text}")
+    print(f"Confidence: {block.confidence}")
+    print(f"Bounding box: {block.bbox}")  # (x1, y1, x2, y2)
+    print(f"Page: {block.page_number}")
+    print()
+```
+
+## Performance Monitoring
+
+### Engine Metrics
+
+```python
+engine = EasyOCREngine(languages=['en'])
+ocr = OCR(layer_1_ocr_engine=engine)
+
+# Process documents
+ocr.get_text("doc1.pdf")
+ocr.get_text("doc2.pdf")
+ocr.get_text("doc3.pdf")
+
+# Get metrics
+metrics = engine.get_metrics()
+
+print(f"Files processed: {metrics.files_processed}")
+print(f"Total pages: {metrics.total_pages}")
+print(f"Total characters: {metrics.total_characters}")
+print(f"Processing time: {metrics.processing_time_ms}ms")
+print(f"Avg confidence: {metrics.average_confidence}")
+```
+
+## Error Handling
+
+### OCR Errors
+
+```python
+from upsonic.ocr.exceptions import OCRError, OCRTimeoutError
+
+try:
+    result = ocr.process_file("document.pdf")
+except OCRTimeoutError as e:
+    print(f"Processing timeout: {e}")
+except OCRError as e:
+    print(f"OCR error: {e}")
+    print(f"Error code: {e.error_code}")
+```
+
+## Agent Integration
+
+### OCR as Task Attachment
+
+```python
+from upsonic import Agent, Task
+
+agent = Agent("openai/gpt-4o")
+
+# Extract text from image
+engine = EasyOCREngine(languages=['en'])
+ocr = OCR(layer_1_ocr_engine=engine)
+text = ocr.get_text("invoice.png")
+
+# Use extracted text with agent
+task = Task(
+    description=f"Analyze this invoice and extract key information:\n\n{text}"
+)
+
+result = agent.do(task)
+print(result)
+```
+
+### OCR with Document Attachments
+
+```python
+# Agent with vision can process images directly
+agent = Agent("openai/gpt-4o")
+
+task = Task(
+    description="Extract text from this invoice",
+    attachments=["invoice.png"]  # Vision model processes image
+)
+
+result = agent.do(task)
+
+# For non-vision models, use OCR first
+text = ocr.get_text("invoice.png")
+task = Task(f"Analyze this invoice text:\n\n{text}")
+result = agent.do(task)
+```
+
+## Complete Example
+
+```python
+from upsonic import Agent, Task, OCR
+from upsonic.ocr.engines import EasyOCREngine
+import asyncio
+
+async def process_invoice():
+    # Create OCR engine
+    engine = EasyOCREngine(
+        languages=['en'],
+        gpu=True  # Use GPU if available
+    )
+    
+    # Create OCR orchestrator
+    ocr = OCR(
+        layer_1_ocr_engine=engine,
+        layer_1_timeout=60.0  # 60 second timeout per page
+    )
+    
+    # Process invoice PDF
+    print("Extracting text from invoice...")
+    result = await ocr.process_file_async("invoice.pdf")
+    
+    print(f"Pages processed: {result.page_count}")
+    print(f"Confidence: {result.confidence:.2%}")
+    print(f"Processing time: {result.processing_time_ms}ms")
+    print()
+    
+    # Show text blocks
+    print("Text blocks:")
+    for i, block in enumerate(result.blocks[:5], 1):  # First 5 blocks
+        print(f"{i}. {block.text} (confidence: {block.confidence:.2%})")
+    print()
+    
+    # Use with agent
+    agent = Agent("openai/gpt-4o")
+    
+    task = Task(
+        description=f"""
+        Analyze this invoice and extract:
+        - Invoice number
+        - Date
+        - Total amount
+        - Line items
+        
+        Invoice text:
+        {result.text}
+        """
+    )
+    
+    analysis = await agent.do_async(task)
+    print("Invoice Analysis:")
+    print(analysis)
+    
+    # Get engine metrics
+    metrics = engine.get_metrics()
+    print(f"\nEngine metrics:")
+    print(f"Files processed: {metrics.files_processed}")
+    print(f"Total pages: {metrics.total_pages}")
+    print(f"Average confidence: {metrics.average_confidence:.2%}")
+
+# Run
+asyncio.run(process_invoice())
+```
+
+## Supported Languages
+
+### EasyOCR Languages
+
+Supports 80+ languages including:
+- Western European: en, fr, de, es, it, pt, nl, etc.
+- Eastern European: ru, pl, uk, cs, etc.
+- Asian: ch_sim, ch_tra, ja, ko, th, vi, etc.
+- Middle Eastern: ar, he, fa, etc.
+- And many more...
+
+### PaddleOCR Languages
+
+Optimized for:
+- Chinese (simplified and traditional)
+- English
+- Japanese
+- Korean
+- Many others...
+
+## Best Practices
+
+1. **Choose the Right Engine**: EasyOCR for general purpose, PaddleOCR for Asian languages
+2. **Use GPU**: Enable GPU for faster processing when available
+3. **Set Timeouts**: Configure timeouts for large documents
+4. **Handle Errors**: Always wrap OCR calls in try-except blocks
+5. **Async for Batch**: Use async operations for processing multiple files
+6. **Monitor Metrics**: Track processing statistics for optimization
+
+## See Also
+
+- [Task](/concepts/task) - Using OCR results with tasks
+- [Agent](/concepts/agent) - Integrating OCR with agents
+- [Document Processing](/guides/documents) - Complete document workflows

@@ -1,0 +1,351 @@
+---
+title: Memory
+description: API reference for the Memory class that orchestrates session and user memory operations
+---
+
+## Memory
+
+The `Memory` class serves as the central coordinator for memory operations in Upsonic, managing both session memory (chat history, summaries) and user memory (user profiles and traits).
+
+### Key Design Principle
+
+Session memory type is selected at **runtime**, not at initialization time. The same Memory instance can be shared across Agent, Team, and Workflow. When methods are called, the caller passes `session_type` and Memory routes to the correct session memory implementation.
+
+### Initialization
+
+```python
+from upsonic.storage.memory import Memory
+from upsonic.storage.redis import RedisStorage
+
+storage = RedisStorage(db_url="redis://localhost:6379/0")
+
+memory = Memory(
+    storage=storage,
+    session_id="session_001",
+    user_id="user_123",
+    full_session_memory=True,
+    summary_memory=True,
+    user_analysis_memory=True,
+    model="openai/gpt-4o"
+)
+```
+
+### Constructor Parameters
+
+<ParamField path="storage" type="Storage" required>
+  Storage backend for persistence (Redis, PostgreSQL, MongoDB, SQLite, etc.)
+</ParamField>
+
+<ParamField path="session_id" type="str" default="auto-generated">
+  Unique session identifier. Auto-generated UUID if not provided.
+</ParamField>
+
+<ParamField path="user_id" type="str" default="auto-generated">
+  Unique user identifier. Auto-generated UUID if not provided.
+</ParamField>
+
+<ParamField path="full_session_memory" type="bool" default="False">
+  Enable chat history persistence
+</ParamField>
+
+<ParamField path="summary_memory" type="bool" default="False">
+  Enable session summary generation
+</ParamField>
+
+<ParamField path="user_analysis_memory" type="bool" default="False">
+  Enable user profile extraction from conversations
+</ParamField>
+
+<ParamField path="user_profile_schema" type="Type[BaseModel]" default="None">
+  Pydantic model defining user profile structure
+</ParamField>
+
+<ParamField path="dynamic_user_profile" type="bool" default="False">
+  Generate profile schema dynamically based on conversation
+</ParamField>
+
+<ParamField path="num_last_messages" type="int" default="None">
+  Limit on message turns to keep in history
+</ParamField>
+
+<ParamField path="model" type="Union[Model, str]" default="None">
+  Model for summary/profile generation (required if summary or user analysis enabled)
+</ParamField>
+
+<ParamField path="debug" type="bool" default="False">
+  Enable debug logging
+</ParamField>
+
+<ParamField path="debug_level" type="int" default="1">
+  Debug verbosity level (1-3)
+</ParamField>
+
+<ParamField path="feed_tool_call_results" type="bool" default="False">
+  Include tool call results in history
+</ParamField>
+
+<ParamField path="user_memory_mode" type="Literal['update', 'replace']" default="'update'">
+  How to update user profile: 'update' merges changes, 'replace' overwrites
+</ParamField>
+
+### Methods
+
+#### prepare_inputs_for_task
+
+Gather all relevant memory data before task execution.
+
+```python
+async def prepare_inputs_for_task(
+    session_type: Optional[SessionType] = None,
+    agent_metadata: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]
+```
+
+**Parameters:**
+- `session_type` - The session type (defaults to AGENT)
+- `agent_metadata` - Optional metadata from the caller to inject
+
+**Returns:**
+Dictionary with prepared memory inputs:
+```python
+{
+    "message_history": [],  # List of messages
+    "context_injection": "",  # Session summary
+    "system_prompt_injection": "",  # User profile
+    "metadata_injection": "",  # Session + agent metadata
+}
+```
+
+**Example:**
+```python
+memory_inputs = await memory.prepare_inputs_for_task(
+    session_type=SessionType.AGENT,
+    agent_metadata={"agent_version": "1.0"}
+)
+```
+
+#### save_session_async
+
+Save session to storage. This is the centralized method for ALL session saving operations.
+
+```python
+async def save_session_async(
+    output: AgentRunOutput,
+    session_type: Optional[SessionType] = None,
+    agent_id: Optional[str] = None,
+) -> None
+```
+
+**Behavior:**
+- For **INCOMPLETE** runs (paused, error, cancelled):
+  - Saves checkpoint state for HITL resumption
+  - Does NOT process memory features (summary, user profile)
+- For **COMPLETED** runs:
+  - Saves the completed run output
+  - Generates session summary (if `summary_memory` enabled)
+  - Analyzes user profile (if `user_analysis_memory` enabled)
+
+**Parameters:**
+- `output` - The run output (AgentRunOutput, TeamRunOutput, etc.)
+- `session_type` - The session type (defaults to AGENT)
+- `agent_id` - Optional agent identifier
+
+**Example:**
+```python
+output = agent.do("Analyze this data")
+await memory.save_session_async(output)
+```
+
+#### get_session / get_session_async
+
+Get the current session from storage.
+
+```python
+def get_session() -> Optional[Session]
+async def get_session_async() -> Optional[Session]
+```
+
+**Returns:** The current session or None
+
+#### get_messages / get_messages_async
+
+Get messages from the current session.
+
+```python
+def get_messages() -> list
+async def get_messages_async() -> list
+```
+
+**Returns:** List of messages from the session
+
+#### set_metadata / set_metadata_async
+
+Set metadata on the current session.
+
+```python
+def set_metadata(metadata: Dict[str, Any]) -> None
+async def set_metadata_async(metadata: Dict[str, Any]) -> None
+```
+
+**Parameters:**
+- `metadata` - Dictionary of metadata to add/update
+
+**Example:**
+```python
+await memory.set_metadata_async({"project": "alpha", "version": "1.0"})
+```
+
+#### get_metadata / get_metadata_async
+
+Get metadata from the current session.
+
+```python
+def get_metadata() -> Optional[Dict[str, Any]]
+async def get_metadata_async() -> Optional[Dict[str, Any]]
+```
+
+**Returns:** Session metadata dictionary or None
+
+#### list_sessions / list_sessions_async
+
+List sessions, optionally filtered by user_id.
+
+```python
+def list_sessions(user_id: Optional[str] = None) -> list
+async def list_sessions_async(user_id: Optional[str] = None) -> list
+```
+
+**Parameters:**
+- `user_id` - Filter by user ID (defaults to current user)
+
+**Returns:** List of sessions
+
+#### find_session / find_session_async
+
+Find a specific session by session_id.
+
+```python
+def find_session(session_id: Optional[str] = None) -> Optional[Session]
+async def find_session_async(session_id: Optional[str] = None) -> Optional[Session]
+```
+
+**Parameters:**
+- `session_id` - Session ID to find (defaults to current session)
+
+**Returns:** Session object or None
+
+#### delete_session / delete_session_async
+
+Delete the current or specified session.
+
+```python
+def delete_session(session_id: Optional[str] = None) -> bool
+async def delete_session_async(session_id: Optional[str] = None) -> bool
+```
+
+**Parameters:**
+- `session_id` - Session ID to delete (defaults to current session)
+
+**Returns:** True if deleted, False otherwise
+
+#### load_resumable_run / load_resumable_run_async
+
+Load a resumable run from storage by run_id.
+
+```python
+def load_resumable_run(
+    run_id: str,
+    session_type: Optional[SessionType] = None,
+    agent_id: Optional[str] = None,
+) -> Optional[RunData]
+
+async def load_resumable_run_async(
+    run_id: str,
+    session_type: Optional[SessionType] = None,
+    agent_id: Optional[str] = None,
+) -> Optional[RunData]
+```
+
+Resumable runs include:
+- **paused**: External tool execution pause
+- **error**: Durable execution (error recovery)
+- **cancelled**: Cancel run resumption
+
+**Parameters:**
+- `run_id` - The run ID to search for
+- `session_type` - The session type (defaults to AGENT)
+- `agent_id` - Optional agent_id to search across sessions
+
+**Returns:** RunData if found and resumable, None otherwise
+
+### Usage with Agent
+
+```python
+from upsonic import Agent
+from upsonic.storage.memory import Memory
+from upsonic.storage.postgres import PostgresStorage
+
+# Create storage and memory
+storage = PostgresStorage(db_url="postgresql://user:pass@localhost/db")
+memory = Memory(
+    storage=storage,
+    full_session_memory=True,
+    summary_memory=True,
+    user_analysis_memory=True,
+    model="openai/gpt-4o"
+)
+
+# Attach to agent
+agent = Agent("openai/gpt-4o", memory=memory)
+
+# Memory is used automatically during agent execution
+result = agent.do("Analyze this document")
+```
+
+### Attributes
+
+<ResponseField name="storage" type="Storage">
+  The storage backend used for persistence
+</ResponseField>
+
+<ResponseField name="session_id" type="str">
+  Current session identifier
+</ResponseField>
+
+<ResponseField name="user_id" type="str">
+  Current user identifier
+</ResponseField>
+
+<ResponseField name="full_session_memory_enabled" type="bool">
+  Whether chat history persistence is enabled
+</ResponseField>
+
+<ResponseField name="summary_memory_enabled" type="bool">
+  Whether session summary generation is enabled
+</ResponseField>
+
+<ResponseField name="user_analysis_memory_enabled" type="bool">
+  Whether user profile extraction is enabled
+</ResponseField>
+
+<ResponseField name="user_memory" type="Optional[BaseUserMemory]">
+  User memory instance (if enabled)
+</ResponseField>
+
+### Memory Features
+
+#### Session Memory
+
+- **Full Session Memory**: Persists complete chat history
+- **Summary Memory**: Generates and stores conversation summaries
+- **Metadata**: Stores custom metadata with sessions
+
+#### User Memory
+
+- **User Profile**: Extracts and maintains user preferences and traits
+- **Dynamic Schema**: Automatically generates profile structure based on conversations
+- **Update Modes**: Choose between merging updates or replacing entire profile
+
+#### HITL Checkpointing
+
+Memory automatically saves checkpoints for incomplete runs (paused, error, cancelled) to enable cross-process resumption, regardless of memory settings.

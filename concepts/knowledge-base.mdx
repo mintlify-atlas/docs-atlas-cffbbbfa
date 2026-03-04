@@ -1,0 +1,558 @@
+---
+title: "KnowledgeBase"
+description: "RAG system with intelligent document processing, vector search, and retrieval"
+---
+
+## Overview
+
+The `KnowledgeBase` class is the central orchestrator for Retrieval-Augmented Generation (RAG) pipelines in Upsonic. It manages the entire lifecycle of documents from ingestion and processing to vector storage and retrieval, providing intelligent document management for AI agents.
+
+## Key Features
+
+- **Intelligent Document Processing**: Automatic loader and chunker detection
+- **Idempotent Operations**: Expensive processing done only once per configuration
+- **Async-First Architecture**: High-performance async operations with sync fallbacks
+- **Flexible Search**: Dense, full-text, and hybrid search capabilities
+- **Document Management**: Track, update, and delete documents
+- **Health Monitoring**: Comprehensive health checks and diagnostics
+- **Agent Integration**: Use as context or tools for agents
+- **Multiple Vector Databases**: Chroma, Pinecone, Qdrant, Weaviate, and more
+
+## Basic Usage
+
+### Simple Knowledge Base
+
+```python
+from upsonic import KnowledgeBase
+from upsonic.vectordb import ChromaProvider
+from upsonic.embeddings import OpenAIEmbedding
+
+# Create vector database
+chroma = ChromaProvider(
+    collection_name="my_docs",
+    persist_directory="./chroma_db"
+)
+
+# Create knowledge base
+kb = KnowledgeBase(
+    sources=["docs/", "README.md"],
+    vectordb=chroma,
+    embedding_provider=OpenAIEmbedding()
+)
+
+# Process and index documents
+await kb.setup_async()
+
+# Query
+results = await kb.query_async("How do I install the package?")
+for result in results:
+    print(result.text)
+```
+
+## Initialization
+
+### Constructor Parameters
+
+```python
+KnowledgeBase(
+    sources: Union[str, Path, List[Union[str, Path]]],
+    vectordb: BaseVectorDBProvider,
+    embedding_provider: Optional[EmbeddingProvider] = None,
+    
+    # Intelligent processing
+    splitters: Optional[Union[BaseChunker, List[BaseChunker]]] = None,
+    loaders: Optional[Union[BaseLoader, List[BaseLoader]]] = None,
+    
+    # Metadata
+    name: Optional[str] = None,
+    description: Optional[str] = None,
+    topics: Optional[List[str]] = None,
+    
+    # Processing configuration
+    use_case: str = "rag_retrieval",
+    quality_preference: str = "balanced",
+    loader_config: Optional[Dict[str, Any]] = None,
+    splitter_config: Optional[Dict[str, Any]] = None,
+)
+```
+
+### Key Parameters
+
+<ParamField path="sources" type="str | Path | List" required>
+  File paths, directory paths, or content strings to process
+</ParamField>
+
+<ParamField path="vectordb" type="BaseVectorDBProvider" required>
+  Vector database provider for storage and retrieval
+</ParamField>
+
+<ParamField path="embedding_provider" type="EmbeddingProvider">
+  Embedding provider for vector generation (optional for some databases)
+</ParamField>
+
+<ParamField path="use_case" type="str" default="rag_retrieval">
+  Optimization target: "rag_retrieval", "semantic_search", "question_answering"
+</ParamField>
+
+<ParamField path="quality_preference" type="str" default="balanced">
+  Speed vs quality: "fast", "balanced", "quality"
+</ParamField>
+
+## Document Processing
+
+### Automatic Loader Detection
+
+Loaders are automatically selected based on file type:
+
+```python
+kb = KnowledgeBase(
+    sources=[
+        "document.pdf",      # PDF loader
+        "data.csv",          # CSV loader
+        "code.py",           # Text loader
+        "slides.pptx",       # PowerPoint loader
+        "notebook.ipynb"     # Jupyter loader
+    ],
+    vectordb=chroma,
+    embedding_provider=OpenAIEmbedding()
+    # Loaders auto-detected!
+)
+```
+
+### Automatic Chunking
+
+Chunkers are automatically selected based on content:
+
+```python
+kb = KnowledgeBase(
+    sources=["docs/"],
+    vectordb=chroma,
+    embedding_provider=OpenAIEmbedding(),
+    use_case="rag_retrieval",  # Optimized for RAG
+    quality_preference="quality"  # Prefer quality over speed
+    # Chunkers auto-detected!
+)
+```
+
+### Custom Loaders and Chunkers
+
+```python
+from upsonic.loaders import PDFLoader
+from upsonic.text_splitter import RecursiveCharacterSplitter
+
+kb = KnowledgeBase(
+    sources=["document.pdf"],
+    vectordb=chroma,
+    embedding_provider=OpenAIEmbedding(),
+    loaders=[PDFLoader(extract_images=True)],
+    splitters=[RecursiveCharacterSplitter(
+        chunk_size=1000,
+        chunk_overlap=200
+    )]
+)
+```
+
+## Vector Databases
+
+### Chroma
+
+```python
+from upsonic.vectordb import ChromaProvider
+
+chroma = ChromaProvider(
+    collection_name="my_docs",
+    persist_directory="./chroma_db"
+)
+
+kb = KnowledgeBase(
+    sources=["docs/"],
+    vectordb=chroma,
+    embedding_provider=OpenAIEmbedding()
+)
+```
+
+### Pinecone
+
+```python
+from upsonic.vectordb import PineconeProvider
+
+pinecone = PineconeProvider(
+    api_key="your-api-key",
+    index_name="my-index",
+    dimension=1536  # OpenAI embedding dimension
+)
+
+kb = KnowledgeBase(
+    sources=["docs/"],
+    vectordb=pinecone,
+    embedding_provider=OpenAIEmbedding()
+)
+```
+
+### Qdrant
+
+```python
+from upsonic.vectordb import QdrantProvider
+
+qdrant = QdrantProvider(
+    url="http://localhost:6333",
+    collection_name="my_docs",
+    vector_size=1536
+)
+
+kb = KnowledgeBase(
+    sources=["docs/"],
+    vectordb=qdrant,
+    embedding_provider=OpenAIEmbedding()
+)
+```
+
+### Weaviate
+
+```python
+from upsonic.vectordb import WeaviateProvider
+
+weaviate = WeaviateProvider(
+    url="http://localhost:8080",
+    class_name="Document"
+)
+
+kb = KnowledgeBase(
+    sources=["docs/"],
+    vectordb=weaviate,
+    embedding_provider=OpenAIEmbedding()
+)
+```
+
+## Searching and Retrieval
+
+### Basic Search
+
+```python
+# Query the knowledge base
+results = await kb.query_async(
+    "What are the installation steps?",
+    top_k=5
+)
+
+for result in results:
+    print(f"Score: {result.score}")
+    print(f"Text: {result.text}")
+    print(f"Source: {result.metadata.get('source')}")
+    print(f"Page: {result.metadata.get('page_number')}")
+    print()
+```
+
+### Hybrid Search
+
+```python
+# Combine dense and full-text search
+results = await kb.query_async(
+    "machine learning algorithms",
+    top_k=10,
+    alpha=0.7,  # 70% dense, 30% full-text
+    fusion_method="rrf"  # Reciprocal Rank Fusion
+)
+```
+
+### Filtered Search
+
+```python
+# Search with metadata filters
+results = await kb.query_async(
+    "API documentation",
+    top_k=5,
+    filter={"category": "technical", "version": "2.0"}
+)
+```
+
+### Similarity Threshold
+
+```python
+# Only return results above threshold
+results = await kb.query_async(
+    "quantum computing",
+    similarity_threshold=0.7  # Min similarity score
+)
+```
+
+## Agent Integration
+
+### As Context (Automatic RAG)
+
+```python
+from upsonic import Agent, Task
+
+kb = KnowledgeBase(
+    sources=["docs/"],
+    vectordb=chroma,
+    embedding_provider=OpenAIEmbedding()
+)
+
+await kb.setup_async()
+
+agent = Agent("openai/gpt-4o")
+
+# RAG is performed automatically
+task = Task(
+    description="How do I configure the database?",
+    context=[kb]  # KB used for retrieval
+)
+
+result = agent.do(task)
+```
+
+### As Tool
+
+```python
+# KB automatically creates a search tool
+agent = Agent(
+    model="openai/gpt-4o",
+    tools=[kb]  # Agent can search KB as a tool
+)
+
+# Agent can call search_<kb_name> tool
+result = agent.do(Task(
+    "Find information about authentication in the docs"
+))
+```
+
+### Custom Tool Name
+
+```python
+kb = KnowledgeBase(
+    sources=["technical_docs/"],
+    vectordb=chroma,
+    embedding_provider=OpenAIEmbedding(),
+    name="technical_docs",  # Creates search_technical_docs tool
+    description="Technical documentation and API references",
+    topics=["API", "configuration", "deployment"]
+)
+```
+
+## Document Management
+
+### Adding Documents
+
+```python
+# Add new documents
+await kb.add_documents_async(["new_doc.pdf", "another.md"])
+```
+
+### Updating Documents
+
+```python
+# Update existing documents
+await kb.update_document_async(
+    document_id="doc_123",
+    new_content="Updated content"
+)
+```
+
+### Deleting Documents
+
+```python
+# Delete by source
+await kb.delete_by_source_async("old_doc.pdf")
+
+# Delete by ID
+await kb.delete_by_id_async("doc_123")
+
+# Delete all
+await kb.delete_all_async()
+```
+
+### Listing Documents
+
+```python
+# Get all indexed documents
+documents = await kb.list_documents_async()
+
+for doc in documents:
+    print(f"ID: {doc.id}")
+    print(f"Source: {doc.source}")
+    print(f"Chunks: {doc.chunk_count}")
+```
+
+## Health and Diagnostics
+
+### Health Check
+
+```python
+# Check knowledge base health
+health = await kb.health_check_async()
+
+print(f"Status: {health['status']}")
+print(f"Document count: {health['document_count']}")
+print(f"Chunk count: {health['chunk_count']}")
+print(f"Vector DB: {health['vectordb_status']}")
+```
+
+### Processing Statistics
+
+```python
+# Get processing stats
+stats = kb.get_processing_stats()
+
+print(f"Documents processed: {stats['documents_processed']}")
+print(f"Chunks created: {stats['chunks_created']}")
+print(f"Processing time: {stats['processing_time_seconds']}s")
+```
+
+## Advanced Features
+
+### Custom Metadata
+
+```python
+kb = KnowledgeBase(
+    sources=["docs/"],
+    vectordb=chroma,
+    embedding_provider=OpenAIEmbedding(),
+    name="ProjectDocs",
+    description="Project documentation and guides",
+    topics=["installation", "configuration", "API", "deployment"]
+)
+```
+
+### Idempotent Processing
+
+Knowledge base generates a unique ID based on configuration. Re-running setup with the same configuration skips processing:
+
+```python
+kb = KnowledgeBase(
+    sources=["docs/"],
+    vectordb=chroma,
+    embedding_provider=OpenAIEmbedding()
+)
+
+# First run: processes documents
+await kb.setup_async()
+
+# Second run: skips processing (same knowledge_id)
+await kb.setup_async()
+```
+
+### Chunking Strategies
+
+```python
+from upsonic.text_splitter import (
+    RecursiveCharacterSplitter,
+    SemanticChunker,
+    MarkdownChunker
+)
+
+# Recursive (general purpose)
+kb = KnowledgeBase(
+    sources=["docs/"],
+    vectordb=chroma,
+    embedding_provider=OpenAIEmbedding(),
+    splitters=[RecursiveCharacterSplitter(
+        chunk_size=1000,
+        chunk_overlap=200
+    )]
+)
+
+# Semantic (content-aware)
+kb = KnowledgeBase(
+    sources=["docs/"],
+    vectordb=chroma,
+    embedding_provider=OpenAIEmbedding(),
+    splitters=[SemanticChunker(
+        embedding_provider=OpenAIEmbedding(),
+        similarity_threshold=0.7
+    )]
+)
+
+# Markdown (preserves structure)
+kb = KnowledgeBase(
+    sources=["docs/"],
+    vectordb=chroma,
+    embedding_provider=OpenAIEmbedding(),
+    splitters=[MarkdownChunker(
+        chunk_size=1000
+    )]
+)
+```
+
+## Complete Example
+
+```python
+from upsonic import Agent, Task, KnowledgeBase
+from upsonic.vectordb import ChromaProvider
+from upsonic.embeddings import OpenAIEmbedding
+from upsonic.text_splitter import RecursiveCharacterSplitter
+import asyncio
+
+async def main():
+    # Create vector database
+    chroma = ChromaProvider(
+        collection_name="company_docs",
+        persist_directory="./vector_db"
+    )
+    
+    # Create knowledge base
+    kb = KnowledgeBase(
+        sources=[
+            "docs/",
+            "README.md",
+            "API_REFERENCE.md"
+        ],
+        vectordb=chroma,
+        embedding_provider=OpenAIEmbedding(),
+        name="company_knowledge",
+        description="Company documentation, guides, and API references",
+        topics=["product", "API", "guides", "troubleshooting"],
+        splitters=[RecursiveCharacterSplitter(
+            chunk_size=1000,
+            chunk_overlap=200
+        )],
+        use_case="rag_retrieval",
+        quality_preference="quality"
+    )
+    
+    # Process and index documents
+    print("Processing documents...")
+    await kb.setup_async()
+    
+    # Check health
+    health = await kb.health_check_async()
+    print(f"Status: {health['status']}")
+    print(f"Documents: {health['document_count']}")
+    print(f"Chunks: {health['chunk_count']}")
+    
+    # Create agent with KB
+    agent = Agent(
+        model="openai/gpt-4o",
+        tools=[kb]  # KB as tool
+    )
+    
+    # Agent can search the knowledge base
+    result = await agent.do_async(Task(
+        "How do I configure the authentication system?"
+    ))
+    print(result)
+    
+    # Direct query
+    results = await kb.query_async(
+        "authentication configuration",
+        top_k=5,
+        alpha=0.7
+    )
+    
+    for i, result in enumerate(results, 1):
+        print(f"\nResult {i}:")
+        print(f"Score: {result.score:.3f}")
+        print(f"Text: {result.text[:200]}...")
+        print(f"Source: {result.metadata.get('source')}")
+
+# Run
+asyncio.run(main())
+```
+
+## See Also
+
+- [Task](/concepts/task) - Using KB as context
+- [Agent](/concepts/agent) - Using KB as tool
+- [Embeddings](/embeddings/overview) - Embedding providers
+- [Vector Databases](/vectordb/overview) - Vector database providers
+- [RAG Guide](/guides/rag) - Complete RAG patterns

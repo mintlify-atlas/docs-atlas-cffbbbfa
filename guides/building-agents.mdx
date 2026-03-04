@@ -1,0 +1,356 @@
+---
+title: Building Agents
+description: Best practices for agent design and development in Upsonic
+---
+
+# Building Agents
+
+Learn how to design and build production-ready AI agents using the Upsonic framework. This guide covers agent architecture, configuration, and best practices.
+
+## Agent Architecture
+
+The `Agent` class is the core building block of Upsonic. It provides:
+
+- Complete model abstraction through Model/Provider/Profile system
+- Advanced tool handling with ToolManager
+- Streaming and non-streaming execution modes
+- Memory management and conversation history
+- Safety policies and guardrails
+- Reliability layers
+
+Reference: `src/upsonic/agent/agent.py:125-162`
+
+## Creating Your First Agent
+
+<Steps>
+  <Step title="Initialize the Agent">
+    Start with a basic agent configuration:
+
+    ```python
+    from upsonic import Agent, Task
+
+    # Basic agent
+    agent = Agent("openai/gpt-4o")
+
+    # Execute a task
+    task = Task("What is 1 + 1?")
+    result = agent.do(task)
+    print(result)
+    ```
+  </Step>
+
+  <Step title="Add Identity and Purpose">
+    Give your agent a clear role and goal:
+
+    ```python
+    agent = Agent(
+        model="openai/gpt-4o",
+        name="Math Teacher",
+        role="Mathematics Educator",
+        goal="Help students understand mathematical concepts",
+        instructions="Explain concepts clearly with examples"
+    )
+    ```
+
+    Reference: `src/upsonic/agent/agent.py:190-195`
+  </Step>
+
+  <Step title="Configure Capabilities">
+    Enable advanced features like tools and memory:
+
+    ```python
+    from upsonic.storage import InMemoryStorage
+    from upsonic.storage.memory import Memory
+
+    # Create memory for conversation history
+    storage = InMemoryStorage()
+    memory = Memory(
+        storage=storage,
+        full_session_memory=True,
+        summary_memory=True
+    )
+
+    # Enhanced agent
+    agent = Agent(
+        model="openai/gpt-4o",
+        name="Research Assistant",
+        memory=memory,
+        enable_thinking_tool=True,
+        tools=[custom_search_tool]
+    )
+    ```
+  </Step>
+</Steps>
+
+## Agent Configuration Options
+
+### Model Selection
+
+Upsonic supports multiple AI providers:
+
+```python
+# OpenAI
+agent = Agent("openai/gpt-4o")
+
+# Anthropic
+agent = Agent("anthropic/claude-3-sonnet")
+
+# Azure OpenAI
+agent = Agent("azure/gpt-4")
+
+# Google
+agent = Agent("google-gla/gemini-1.5-pro")
+```
+
+### Reasoning Configuration
+
+Control agent thinking and reasoning:
+
+```python
+agent = Agent(
+    model="openai/gpt-4o",
+    # OpenAI reasoning settings
+    reasoning_effort="high",  # "low", "medium", "high"
+    reasoning_summary="detailed",  # "concise", "detailed"
+    
+    # Anthropic thinking settings
+    thinking_enabled=True,
+    thinking_budget=10000,  # token budget
+    
+    # Groq reasoning format
+    reasoning_format="parsed"  # "hidden", "raw", "parsed"
+)
+```
+
+Reference: `src/upsonic/agent/agent.py:277-283`
+
+### System Prompts and Context
+
+```python
+agent = Agent(
+    model="openai/gpt-4o",
+    system_prompt="You are a helpful assistant specialized in data analysis.",
+    company_name="Acme Corp",
+    company_objective="Deliver data-driven insights",
+    metadata={
+        "version": "1.0",
+        "environment": "production"
+    }
+)
+```
+
+## Execution Modes
+
+### Synchronous Execution
+
+```python
+# Standard execution
+result = agent.do(task)
+
+# With output printing
+result = agent.print_do(task)
+```
+
+### Asynchronous Execution
+
+```python
+import asyncio
+
+async def main():
+    result = await agent.do_async(task)
+    print(result)
+
+asyncio.run(main())
+```
+
+### Streaming Execution
+
+```python
+# Synchronous streaming
+for chunk in agent.stream(task):
+    print(chunk, end="", flush=True)
+
+# Asynchronous streaming
+async def stream_response():
+    async for chunk in agent.astream(task):
+        print(chunk, end="", flush=True)
+```
+
+Reference: `src/upsonic/agent/agent.py:1544-1633`
+
+## Advanced Features
+
+### Context Management
+
+Automatic context window management prevents token limit errors:
+
+```python
+agent = Agent(
+    model="openai/gpt-4o",
+    memory=memory,
+    context_management=True,
+    context_management_keep_recent=5,  # Keep last 5 messages
+    context_management_model="openai/gpt-4-turbo"  # Use for compression
+)
+```
+
+Reference: `src/upsonic/agent/agent.py:244-252`
+
+### Reflection and Self-Evaluation
+
+```python
+from upsonic.reflection import ReflectionConfig
+
+reflection_config = ReflectionConfig(
+    enabled=True,
+    max_iterations=3,
+    improvement_threshold=0.8
+)
+
+agent = Agent(
+    model="openai/gpt-4o",
+    reflection=True,
+    reflection_config=reflection_config
+)
+```
+
+### Tool Integration
+
+Add tools to extend agent capabilities:
+
+```python
+from upsonic.tools import tool
+
+@tool
+def calculate_age(birth_year: int) -> int:
+    """Calculate age from birth year."""
+    from datetime import datetime
+    return datetime.now().year - birth_year
+
+agent = Agent(
+    model="openai/gpt-4o",
+    tools=[calculate_age]
+)
+```
+
+## Best Practices
+
+<Tip>
+**Clear Identity**: Always give agents a clear name, role, and goal. This helps the LLM understand its purpose and maintain consistent behavior.
+</Tip>
+
+<Tip>
+**Memory Management**: Use `num_last_messages` to limit memory size for long conversations:
+
+```python
+memory = Memory(
+    storage=storage,
+    full_session_memory=True,
+    num_last_messages=20  # Keep only last 20 messages
+)
+```
+</Tip>
+
+<Warning>
+**Token Limits**: Monitor token usage with large contexts. Enable `context_management` to automatically handle context window limits.
+</Warning>
+
+<Tip>
+**Debug Mode**: Enable debug logging during development:
+
+```python
+agent = Agent(
+    model="openai/gpt-4o",
+    debug=True,
+    debug_level=2  # 1=standard, 2=detailed
+)
+```
+</Tip>
+
+## Agent Lifecycle
+
+### Initialization
+
+```python
+# Agent is initialized but not connected
+agent = Agent("openai/gpt-4o", memory=memory)
+```
+
+### Execution
+
+```python
+# First execution triggers setup
+result = agent.do(task)  # Memory is loaded, tools are registered
+```
+
+### Session Management
+
+```python
+# Get session usage
+usage = agent.get_session_usage()
+print(f"Tokens: {usage.total_tokens}")
+print(f"Cost: ${usage.total_cost}")
+
+# Get run output
+run_output = agent.get_run_output()
+print(f"Status: {run_output.status}")
+print(f"Tool calls: {run_output.tool_call_count}")
+```
+
+Reference: `src/upsonic/agent/agent.py:731-788`
+
+## Common Patterns
+
+### Research Agent
+
+```python
+from upsonic import Agent, Task
+from upsonic.tools.builtin_tools import WebSearch
+
+researcher = Agent(
+    model="openai/gpt-4o",
+    name="Research Assistant",
+    role="Information Researcher",
+    goal="Find accurate and relevant information",
+    tools=[WebSearch()],
+    memory=memory
+)
+
+task = Task("Find the latest news about AI safety research")
+result = researcher.do(task)
+```
+
+### Data Analysis Agent
+
+```python
+data_analyst = Agent(
+    model="openai/gpt-4o",
+    name="Data Analyst",
+    role="Data Analysis Specialist",
+    goal="Analyze data and provide insights",
+    tools=[pandas_tool, visualization_tool],
+    enable_reasoning_tool=True
+)
+```
+
+### Customer Support Agent
+
+```python
+support_agent = Agent(
+    model="openai/gpt-4o",
+    name="Support Agent",
+    role="Customer Support Representative",
+    goal="Help customers solve their problems",
+    memory=memory,  # Remember conversation context
+    company_name="Acme Corp",
+    company_objective="Provide excellent customer service",
+    user_policy=content_safety_policy  # Filter inappropriate content
+)
+```
+
+## Next Steps
+
+- [Multi-Agent Workflows](/guides/multi-agent-workflows) - Learn to coordinate multiple agents
+- [Custom Tools](/guides/custom-tools) - Build custom tools for your agents
+- [Memory Management](/guides/memory-management) - Deep dive into memory systems
+- [Safety Policies](/guides/safety-policies) - Implement safety guardrails

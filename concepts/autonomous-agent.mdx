@@ -1,0 +1,401 @@
+---
+title: "AutonomousAgent"
+description: "Pre-configured agent with filesystem and shell tools for coding and automation tasks"
+---
+
+## Overview
+
+`AutonomousAgent` is a specialized agent that inherits from `Agent` and comes pre-configured with filesystem and shell capabilities. It's the ideal choice for coding assistants, DevOps automation, system administration, and any task requiring file or shell access.
+
+## Key Features
+
+- **Default Storage & Memory**: Automatically creates InMemoryStorage and Memory if not provided
+- **Filesystem Tools**: Read, write, edit, search, list, move, copy, delete files
+- **Shell Tools**: Execute terminal commands with timeout and output capture
+- **Workspace Sandboxing**: All operations are restricted to a designated workspace directory
+- **Security-First**: Built-in command filtering and path validation
+- **Greeting Workflow**: Optional automatic greeting when workspace is set
+
+## Basic Usage
+
+### Simple Autonomous Agent
+
+```python
+from upsonic import AutonomousAgent
+
+# Create agent with workspace
+agent = AutonomousAgent(
+    model="openai/gpt-4o",
+    workspace="/path/to/project"
+)
+
+# Execute file operations
+result = agent.do("Read the main.py file and add error handling")
+```
+
+### Agent with Full Session Memory
+
+```python
+agent = AutonomousAgent(
+    model="anthropic/claude-sonnet-4-20250514",
+    workspace="/path/to/project",
+    name="CodeAssistant",
+    full_session_memory=True,  # Enable chat history
+    summary_memory=True  # Enable session summaries
+)
+
+# Multi-turn coding assistance
+agent.do("List all Python files in the project")
+agent.do("Read the main.py file")
+agent.do("Add logging to the main function")
+```
+
+## Initialization
+
+### Constructor Parameters
+
+```python
+AutonomousAgent(
+    model: Union[str, Model] = "openai/gpt-4o",
+    *,
+    # Workspace
+    workspace: Optional[str] = None,  # Defaults to current directory
+    
+    # Storage/Memory
+    storage: Optional[Storage] = None,
+    memory: Optional[Memory] = None,
+    full_session_memory: bool = True,
+    summary_memory: bool = False,
+    
+    # Toolkit Configuration
+    enable_filesystem: bool = True,
+    enable_shell: bool = True,
+    shell_timeout: int = 120,
+    shell_max_output: int = 10000,
+    blocked_commands: Optional[List[str]] = None,
+    
+    # Heartbeat (for interfaces)
+    heartbeat: bool = False,
+    heartbeat_period: int = 30,
+    heartbeat_message: str = "",
+    
+    # ... all Agent parameters ...
+)
+```
+
+### Key Parameters
+
+<ParamField path="workspace" type="str">
+  Workspace directory path. All file/shell operations are restricted to this directory. Defaults to current working directory.
+</ParamField>
+
+<ParamField path="full_session_memory" type="bool" default="true">
+  Enable chat history persistence (default: True for AutonomousAgent)
+</ParamField>
+
+<ParamField path="enable_filesystem" type="bool" default="true">
+  Enable filesystem tools (read, write, edit, etc.)
+</ParamField>
+
+<ParamField path="enable_shell" type="bool" default="true">
+  Enable shell command execution tools
+</ParamField>
+
+<ParamField path="shell_timeout" type="int" default="120">
+  Default timeout for shell commands in seconds
+</ParamField>
+
+<ParamField path="blocked_commands" type="List[str]">
+  List of command patterns to block for security
+</ParamField>
+
+## Built-in Tools
+
+### Filesystem Tools
+
+The agent automatically includes these filesystem tools:
+
+- **`read_file(path, offset, limit)`**: Read file contents with pagination support
+- **`write_file(path, content)`**: Create or overwrite files (creates parent directories)
+- **`edit_file(path, old_string, new_string)`**: Make precise text replacements
+- **`list_files(path, pattern)`**: List directory contents with filtering
+- **`search_files(pattern)`**: Find files by name pattern
+- **`grep_files(pattern, path)`**: Search for text/regex in file contents
+- **`file_info(path)`**: Get file metadata (size, permissions, modification time)
+- **`create_directory(path)`**: Create directories
+- **`move_file(source, dest)`**: Move or rename files/directories
+- **`copy_file(source, dest)`**: Copy files or directories
+- **`delete_file(path)`**: Delete files or directories
+
+### Shell Tools
+
+The agent includes these shell execution tools:
+
+- **`run_command(command, timeout)`**: Execute shell commands
+- **`run_python(code)`**: Execute Python code snippets
+- **`check_command_exists(command)`**: Verify command availability
+
+## Example Use Cases
+
+### Coding Assistant
+
+```python
+agent = AutonomousAgent(
+    model="openai/gpt-4o",
+    workspace="/path/to/project",
+    name="CodeReviewer"
+)
+
+# Code review and refactoring
+agent.do(
+    "Review all Python files in the src/ directory and "
+    "suggest improvements for error handling"
+)
+```
+
+### DevOps Automation
+
+```python
+agent = AutonomousAgent(
+    model="anthropic/claude-3-sonnet",
+    workspace="/path/to/project",
+    enable_shell=True
+)
+
+# Automated deployment tasks
+agent.do(
+    "Run the test suite, and if all tests pass, "
+    "build the Docker image and update the deployment config"
+)
+```
+
+### Documentation Generator
+
+```python
+agent = AutonomousAgent(
+    model="openai/gpt-4o",
+    workspace="/path/to/project",
+    name="DocGenerator"
+)
+
+# Generate documentation
+agent.do(
+    "Read all Python files in src/ and generate API documentation "
+    "in Markdown format in the docs/ folder"
+)
+```
+
+### Log Analysis
+
+```python
+agent = AutonomousAgent(
+    model="openai/gpt-4o",
+    workspace="/var/logs",
+    enable_shell=True
+)
+
+# Analyze logs
+agent.do(
+    "Search for errors in application.log from the last 24 hours "
+    "and provide a summary with the most common error types"
+)
+```
+
+## Security Features
+
+### Workspace Sandboxing
+
+All file and shell operations are restricted to the workspace:
+
+```python
+agent = AutonomousAgent(
+    model="openai/gpt-4o",
+    workspace="/safe/project"
+)
+
+# This works - inside workspace
+agent.do("Read /safe/project/data.txt")
+
+# This is blocked - path traversal attempt
+agent.do("Read /etc/passwd")  # Blocked by path validation
+```
+
+### Command Filtering
+
+Dangerous commands are blocked by default:
+
+```python
+agent = AutonomousAgent(
+    model="openai/gpt-4o",
+    workspace="/path/to/project",
+    blocked_commands=["rm -rf /", "dd", "mkfs"]
+)
+```
+
+### File Access Tracking
+
+The filesystem toolkit tracks which files have been read:
+
+```python
+# Reset tracking if needed
+agent.reset_filesystem_tracking()
+```
+
+## Advanced Features
+
+### Custom System Prompt
+
+The agent builds a dynamic system prompt based on enabled tools. You can also provide a custom one:
+
+```python
+agent = AutonomousAgent(
+    model="openai/gpt-4o",
+    workspace="/path/to/project",
+    system_prompt="You are a Python expert. Focus on writing clean, maintainable code."
+)
+```
+
+### Workspace Greeting
+
+When workspace is set, the agent can generate a greeting message:
+
+```python
+agent = AutonomousAgent(
+    model="openai/gpt-4o",
+    workspace="/path/to/project"  # Loads AGENTS.md if present
+)
+
+# Execute greeting (done automatically before first task)
+greeting = agent.execute_workspace_greeting()
+print(greeting)  # "Hello! What would you like to work on today?"
+```
+
+### Heartbeat Execution
+
+For long-running sessions or interfaces:
+
+```python
+agent = AutonomousAgent(
+    model="openai/gpt-4o",
+    workspace="/path/to/project",
+    heartbeat=True,
+    heartbeat_period=30,  # minutes
+    heartbeat_message="Provide a brief status update"
+)
+
+# Execute heartbeat manually
+status = agent.execute_heartbeat()
+```
+
+### Storage and Memory Properties
+
+Access the auto-created storage and memory:
+
+```python
+agent = AutonomousAgent(
+    model="openai/gpt-4o",
+    workspace="/path/to/project"
+)
+
+# Access storage
+print(agent.autonomous_storage)  # InMemoryStorage instance
+
+# Access memory
+print(agent.autonomous_memory)  # Memory instance
+
+# Access toolkits
+print(agent.filesystem_toolkit)  # AutonomousFilesystemToolKit
+print(agent.shell_toolkit)  # AutonomousShellToolKit
+```
+
+## Complete Example
+
+```python
+from upsonic import AutonomousAgent
+
+# Create autonomous coding assistant
+agent = AutonomousAgent(
+    model="anthropic/claude-sonnet-4-20250514",
+    workspace="/home/user/my-project",
+    name="CodeAssistant",
+    role="Senior Python Developer",
+    goal="Help maintain and improve the codebase",
+    
+    # Memory
+    full_session_memory=True,
+    summary_memory=True,
+    
+    # Tools
+    enable_filesystem=True,
+    enable_shell=True,
+    shell_timeout=60,
+    
+    # Security
+    blocked_commands=["rm -rf", "dd"],
+    
+    # Debug
+    debug=True
+)
+
+# Multi-step task
+task = """
+1. Read the main.py file
+2. Add error handling to all functions
+3. Run the test suite
+4. If tests pass, commit the changes
+"""
+
+result = agent.do(task)
+print(result)
+```
+
+## System Prompt Structure
+
+The agent automatically generates a comprehensive system prompt:
+
+```text
+<AutonomousAgent>
+You are an Autonomous Agent with access to tools for completing tasks within your designated workspace.
+
+## Your Capabilities
+
+### Filesystem Tools
+You have comprehensive filesystem access within the workspace:
+- read_file: Read file contents
+- write_file: Create new files or overwrite
+- edit_file: Make precise text replacements
+...
+
+### Shell Tools
+You can execute commands in the workspace directory:
+- run_command: Execute shell commands
+- run_python: Execute Python code snippets
+...
+
+## Guidelines
+
+### When to Use Filesystem Tools
+- Reading code: Use read_file before making changes
+- Creating files: Use write_file for new files
+...
+
+## Best Practices
+1. Read before edit
+2. Use precise edits
+3. Check command availability
+4. Handle errors gracefully
+5. Work incrementally
+
+## Security Restrictions
+- All file operations are sandboxed to the workspace
+- Path traversal outside workspace is blocked
+- Dangerous shell commands are blocked
+</AutonomousAgent>
+```
+
+## See Also
+
+- [Agent](/concepts/agent) - Base Agent class
+- [Tools](/concepts/tools) - Tool system overview
+- [Memory](/concepts/memory) - Memory management
+- [Task](/concepts/task) - Task definition

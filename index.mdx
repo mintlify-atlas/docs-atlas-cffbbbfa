@@ -1,97 +1,240 @@
 ---
-title: "Introduction"
-description: "Welcome to the new home for your documentation"
+title: Upsonic Documentation
+description: Production-ready AI agent framework with safety policies, multi-agent coordination, and MCP tool integration
+mode: custom
 ---
 
-## Setting up
+<div className="relative overflow-hidden dark:bg-[#0f1117] bg-white py-20">
+  <div className="max-w-7xl mx-auto px-6 lg:px-8">
+    <div className="grid lg:grid-cols-12 gap-12 items-center">
+      <div className="lg:col-span-7">
+        <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold dark:text-white text-gray-900 mb-6">
+          Production-ready AI agent framework
+        </h1>
+        <p className="text-base sm:text-lg lg:text-xl dark:text-gray-400 text-gray-600 mb-8 max-w-2xl">
+          Build reliable AI agents with built-in safety policies, multi-agent coordination, memory management, and seamless MCP tool integration.
+        </p>
+        <div className="flex flex-wrap gap-4">
+          <a
+            href="/quickstart"
+            className="inline-flex items-center px-6 py-3 rounded-lg font-semibold text-white transition-colors"
+            style={{ backgroundColor: '#04d47d' }}
+            onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#03b869'}
+            onMouseOut={(e) => e.currentTarget.style.backgroundColor = '#04d47d'}
+          >
+            Get started
+            <svg className="ml-2 w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+            </svg>
+          </a>
+          <a
+            href="/api/agent"
+            className="inline-flex items-center px-6 py-3 rounded-lg font-semibold dark:text-white text-gray-900 border dark:border-white/20 border-gray-300 dark:bg-white/5 bg-gray-50 dark:hover:bg-white/10 hover:bg-gray-100 transition-colors"
+          >
+            API reference
+          </a>
+        </div>
+      </div>
+      <div className="lg:col-span-5 hidden lg:block">
+        <div className="relative dark:bg-[#1a1d27] bg-gray-50 rounded-2xl p-6 dark:border dark:border-[#27272a] border border-gray-200">
+          <div className="font-mono text-sm">
+            <div className="dark:text-gray-500 text-gray-500 mb-2"># Install Upsonic</div>
+            <div className="dark:text-[#04d47d] text-[#04d47d]">pip install upsonic</div>
+            <div className="dark:text-gray-500 text-gray-500 mt-4 mb-2"># Create your first agent</div>
+            <div className="dark:text-gray-300 text-gray-700">
+              <span className="dark:text-purple-400 text-purple-600">from</span> upsonic <span className="dark:text-purple-400 text-purple-600">import</span> Agent, Task
+            </div>
+            <div className="dark:text-gray-300 text-gray-700 mt-2">
+              agent = Agent(model=<span className="dark:text-yellow-400 text-yellow-600">"anthropic/claude-sonnet-4-5"</span>)
+            </div>
+            <div className="dark:text-gray-300 text-gray-700 mt-2">
+              task = Task(description=<span className="dark:text-yellow-400 text-yellow-600">"Analyze market trends"</span>)
+            </div>
+            <div className="dark:text-gray-300 text-gray-700 mt-2">
+              agent.print_do(task)
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
 
-Get your documentation site up and running in minutes.
+<div className="mt-16 mb-16 max-w-5xl mx-auto px-6">
+  <h2 className="text-2xl sm:text-3xl font-bold dark:text-white text-gray-900 mb-3">
+    Quick start
+  </h2>
+  <p className="dark:text-gray-400 text-gray-600 mb-8">
+    Get up and running with Upsonic in minutes
+  </p>
 
-<Card
-  title="Start here"
-  icon="rocket"
-  href="/quickstart"
-  horizontal
->
-  Follow our three step quickstart guide.
-</Card>
+  <Steps>
+    <Step title="Install Upsonic">
+      Install the package using pip or uv:
 
-## Make it yours
+      ```bash
+      pip install upsonic
+      ```
 
-Design a docs site that looks great and empowers your users.
+      For additional features, install with extras:
 
-<Columns cols={2}>
-  <Card
-    title="Edit locally"
-    icon="pen-to-square"
-    href="/development"
-  >
-    Edit your docs locally and preview them in real time.
-  </Card>
-  <Card
-    title="Customize your site"
-    icon="palette"
-    href="/essentials/settings"
-  >
-    Customize the design and colors of your site to match your brand.
-  </Card>
-    <Card
-    title="Set up navigation"
-    icon="map"
-    href="/essentials/navigation"
-  >
-    Organize your docs to help users find what they need and succeed with your product.
-  </Card>
-  <Card
-    title="API documentation"
-    icon="terminal"
-    href="/api-reference/introduction"
-  >
-    Auto-generate API documentation from OpenAPI specifications.
-  </Card>
-</Columns>
+      ```bash
+      pip install "upsonic[ocr,storage,models]"
+      ```
+    </Step>
 
-## Create beautiful pages
+    <Step title="Set up your API key">
+      Configure your AI provider credentials:
 
-Everything you need to create world-class documentation.
+      ```bash
+      export ANTHROPIC_API_KEY="your-api-key"
+      # or
+      export OPENAI_API_KEY="your-api-key"
+      ```
 
-<Columns cols={2}>
-  <Card
-    title="Write with MDX"
-    icon="pen-fancy"
-    href="/essentials/markdown"
-  >
-    Use MDX to style your docs pages.
-  </Card>
-  <Card
-    title="Code samples"
-    icon="code"
-    href="/essentials/code"
-  >
-    Add sample code to demonstrate how to use your product.
-  </Card>
-  <Card
-    title="Images"
-    icon="image"
-    href="/essentials/images"
-  >
-    Display images and other media.
-  </Card>
-  <Card
-    title="Reusable snippets"
-    icon="recycle"
-    href="/essentials/reusable-snippets"
-  >
-    Write once and reuse across your docs.
-  </Card>
-</Columns>
+      Upsonic supports OpenAI, Anthropic, Azure, AWS Bedrock, Google, and more.
+    </Step>
 
-## Need inspiration?
+    <Step title="Create your first agent">
+      Create a simple agent and run a task:
 
-<Card
-  title="See complete examples"
-  icon="stars"
-  href="https://mintlify.com/customers"
->
-  Browse our showcase of exceptional documentation sites.
-</Card>
+      ```python
+      from upsonic import Agent, Task
+
+      agent = Agent(
+          model="anthropic/claude-sonnet-4-5",
+          name="Assistant"
+      )
+
+      task = Task(description="Explain quantum computing in simple terms")
+      result = agent.do(task)
+      print(result)
+      ```
+
+      Your agent is now ready to execute tasks!
+    </Step>
+  </Steps>
+</div>
+
+<div className="mt-16 mb-16 max-w-5xl mx-auto px-6">
+  <h2 className="text-2xl sm:text-3xl font-bold dark:text-white text-gray-900 mb-3">
+    Explore by topic
+  </h2>
+  <p className="dark:text-gray-400 text-gray-600 mb-8">
+    Learn about Upsonic's core capabilities
+  </p>
+
+  <CardGroup cols={2}>
+    <Card title="Agents" icon="robot" href="/concepts/agent">
+      Create intelligent agents that can reason, use tools, and execute complex tasks
+    </Card>
+    <Card title="Autonomous agents" icon="gears" href="/concepts/autonomous-agent">
+      Build agents with filesystem and shell access for automation workflows
+    </Card>
+    <Card title="Safety engine" icon="shield" href="/concepts/safety-engine">
+      Policy-based content filtering for PII, profanity, and sensitive data
+    </Card>
+    <Card title="Multi-agent teams" icon="users" href="/concepts/team">
+      Coordinate multiple agents working together in parallel or sequence
+    </Card>
+    <Card title="Memory management" icon="database" href="/concepts/memory">
+      Session and long-term memory with multiple storage backends
+    </Card>
+    <Card title="Tools & MCP" icon="wrench" href="/concepts/tools">
+      Integrate MCP tools and create custom tools for your agents
+    </Card>
+    <Card title="Knowledge base" icon="book" href="/concepts/knowledge-base">
+      RAG-powered knowledge retrieval with document processing
+    </Card>
+    <Card title="OCR processing" icon="file-image" href="/concepts/ocr">
+      Extract text from images and PDFs with multiple OCR engines
+    </Card>
+  </CardGroup>
+</div>
+
+<div className="mt-16 mb-16 max-w-5xl mx-auto px-6">
+  <h2 className="text-2xl sm:text-3xl font-bold dark:text-white text-gray-900 mb-3">
+    Popular guides
+  </h2>
+  <p className="dark:text-gray-400 text-gray-600 mb-8">
+    Step-by-step tutorials for common use cases
+  </p>
+
+  <CardGroup cols={2}>
+    <Card title="Building agents" icon="hammer" href="/guides/building-agents">
+      Learn best practices for designing and building production agents
+    </Card>
+    <Card title="Multi-agent workflows" icon="diagram-project" href="/guides/multi-agent-workflows">
+      Orchestrate complex tasks across specialized agent teams
+    </Card>
+    <Card title="Custom tools" icon="screwdriver-wrench" href="/guides/custom-tools">
+      Extend your agents with custom tool implementations
+    </Card>
+    <Card title="Safety policies" icon="lock" href="/guides/safety-policies">
+      Implement content filtering and safety guardrails
+    </Card>
+  </CardGroup>
+</div>
+
+<div className="mt-16 mb-16 max-w-5xl mx-auto px-6">
+  <h2 className="text-2xl sm:text-3xl font-bold dark:text-white text-gray-900 mb-3">
+    Integration & deployment
+  </h2>
+  <p className="dark:text-gray-400 text-gray-600 mb-8">
+    Tools and platforms for production deployment
+  </p>
+
+  <CardGroup cols={3}>
+    <Card title="MCP tools" icon="plug" href="/tools/mcp-tools">
+      Integrate Model Context Protocol servers
+    </Card>
+    <Card title="Storage backends" icon="server" href="/tools/storage-backends">
+      Redis, PostgreSQL, MongoDB, and more
+    </Card>
+    <Card title="Model providers" icon="brain" href="/tools/model-providers">
+      OpenAI, Anthropic, Azure, Bedrock, Google
+    </Card>
+    <Card title="CLI" icon="terminal" href="/deployment/cli">
+      Project management and deployment tools
+    </Card>
+    <Card title="Interfaces" icon="window" href="/deployment/interfaces">
+      Slack, Gmail, Telegram, WhatsApp integrations
+    </Card>
+    <Card title="AgentOS" icon="cloud" href="/deployment/agentos">
+      Kubernetes-based production runtime
+    </Card>
+  </CardGroup>
+</div>
+
+<div className="mt-16 mb-16 max-w-5xl mx-auto px-6">
+  <div className="dark:bg-[#1a1d27] bg-gray-50 rounded-2xl p-8 dark:border dark:border-[#27272a] border border-gray-200">
+    <div className="max-w-3xl">
+      <h2 className="text-2xl sm:text-3xl font-bold dark:text-white text-gray-900 mb-3">
+        Ready to build production agents?
+      </h2>
+      <p className="dark:text-gray-400 text-gray-600 mb-6">
+        Start building reliable AI agents with Upsonic's comprehensive framework. Get up and running in minutes with our quickstart guide.
+      </p>
+      <div className="flex flex-wrap gap-4">
+        <a
+          href="/quickstart"
+          className="inline-flex items-center px-6 py-3 rounded-lg font-semibold text-white transition-colors"
+          style={{ backgroundColor: '#04d47d' }}
+          onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#03b869'}
+          onMouseOut={(e) => e.currentTarget.style.backgroundColor = '#04d47d'}
+        >
+          Get started
+        </a>
+        <a
+          href="https://github.com/Upsonic/Upsonic"
+          className="inline-flex items-center px-6 py-3 rounded-lg font-semibold dark:text-white text-gray-900 dark:bg-white/5 bg-white dark:hover:bg-white/10 hover:bg-gray-50 transition-colors dark:border dark:border-white/20 border border-gray-300"
+        >
+          <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 24 24">
+            <path fillRule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z" clipRule="evenodd" />
+          </svg>
+          View on GitHub
+        </a>
+      </div>
+    </div>
+  </div>
+</div>

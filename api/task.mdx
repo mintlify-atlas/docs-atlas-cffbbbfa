@@ -1,0 +1,524 @@
+---
+title: Task
+description: Complete API reference for the Task class - task definition and execution
+---
+
+## Overview
+
+The Task class represents a unit of work to be executed by an Agent. It encapsulates the task description, attachments, tools, response format, caching configuration, and execution metadata.
+
+## Class Definition
+
+```python
+from upsonic import Task
+
+task = Task(
+    description="Analyze this data and provide insights",
+    attachments=["data.csv"],
+    response_format=AnalysisResult
+)
+```
+
+## Constructor Parameters
+
+<ParamField path="description" type="str" required>
+  Task description or instruction for the agent to execute
+</ParamField>
+
+<ParamField path="attachments" type="List[str]" default="None">
+  List of file paths to attach to the task. Files can be images, PDFs, documents, etc.
+</ParamField>
+
+<ParamField path="tools" type="list[Any]" default="None">
+  List of tools specific to this task (functions, ToolKits, agents, etc.)
+</ParamField>
+
+<ParamField path="response_format" type="Union[Type[BaseModel], type[str], None]" default="str">
+  Expected response format - can be str for text, or a Pydantic BaseModel for structured output
+</ParamField>
+
+<ParamField path="response_lang" type="str" default="en">
+  Language code for response (e.g., "en", "es", "fr")
+</ParamField>
+
+<ParamField path="context" type="Any" default="None">
+  Additional context for the task - can be strings, lists, dicts, or file paths
+</ParamField>
+
+<ParamField path="enable_thinking_tool" type="bool" default="None">
+  Enable the plan_and_execute orchestrated thinking tool for this task
+</ParamField>
+
+<ParamField path="enable_cache" type="bool" default="False">
+  Enable semantic caching for this task
+</ParamField>
+
+<ParamField path="cache_method" type="Literal['vector_search', 'llm_call']" default="vector_search">
+  Caching method - vector_search for semantic similarity or llm_call for LLM-based comparison
+</ParamField>
+
+<ParamField path="cache_threshold" type="float" default="0.7">
+  Similarity threshold for cache hits (0.0 to 1.0)
+</ParamField>
+
+<ParamField path="cache_duration_minutes" type="int" default="60">
+  Cache entry validity duration in minutes
+</ParamField>
+
+<ParamField path="guardrail" type="Callable" default="None">
+  Validation function to check the response before returning
+</ParamField>
+
+<ParamField path="guardrail_retries" type="int" default="None">
+  Number of retry attempts if guardrail validation fails
+</ParamField>
+
+### Vector Search Parameters
+
+<ParamField path="vector_search_top_k" type="int" default="None">
+  Number of results to return from RAG/knowledge base queries
+</ParamField>
+
+<ParamField path="vector_search_alpha" type="float" default="None">
+  Weighting factor for hybrid search (0.0 = full-text only, 1.0 = vector only)
+</ParamField>
+
+<ParamField path="vector_search_fusion_method" type="Literal['rrf', 'weighted']" default="None">
+  Fusion method for combining vector and full-text search results
+</ParamField>
+
+<ParamField path="vector_search_similarity_threshold" type="float" default="None">
+  Minimum similarity score for RAG results (0.0 to 1.0)
+</ParamField>
+
+<ParamField path="vector_search_filter" type="Dict[str, Any]" default="None">
+  Metadata filters for RAG queries (e.g., `{{"source": "manual.pdf"}}`)
+</ParamField>
+
+## Properties
+
+### id
+
+Unique task identifier.
+
+```python
+task_id = task.id
+```
+
+<ResponseField name="id" type="str">
+  Auto-generated UUID for the task
+</ResponseField>
+
+### response
+
+Get the task response after execution.
+
+```python
+result = task.response
+```
+
+<ResponseField name="response" type="Union[str, bytes]">
+  The task response set by the agent
+</ResponseField>
+
+### duration
+
+Get task execution duration.
+
+```python
+duration = task.duration
+```
+
+<ResponseField name="duration" type="float">
+  Execution duration in seconds, or None if not completed
+</ResponseField>
+
+### total_cost
+
+Get estimated cost of task execution.
+
+```python
+cost = task.total_cost
+```
+
+<ResponseField name="cost" type="float">
+  Estimated cost in USD based on token usage
+</ResponseField>
+
+### total_input_token
+
+Get total input tokens used.
+
+```python
+input_tokens = task.total_input_token
+```
+
+<ResponseField name="tokens" type="int">
+  Number of input tokens
+</ResponseField>
+
+### total_output_token
+
+Get total output tokens used.
+
+```python
+output_tokens = task.total_output_token
+```
+
+<ResponseField name="tokens" type="int">
+  Number of output tokens
+</ResponseField>
+
+### cache_hit
+
+Check if response came from cache.
+
+```python
+if task.cache_hit:
+    print("Response served from cache!")
+```
+
+<ResponseField name="hit" type="bool">
+  True if response was retrieved from cache
+</ResponseField>
+
+### tool_calls
+
+Get all tool calls made during execution.
+
+```python
+calls = task.tool_calls
+```
+
+<ResponseField name="calls" type="List[Dict[str, Any]]">
+  List of tool call information including name, parameters, and results
+</ResponseField>
+
+### run_id
+
+Get the run ID associated with this task.
+
+```python
+run_id = task.run_id
+```
+
+<ResponseField name="run_id" type="str">
+  Unique identifier for the execution run
+</ResponseField>
+
+### is_completed
+
+Check if task has completed.
+
+```python
+if task.is_completed:
+    print("Task finished!")
+```
+
+<ResponseField name="completed" type="bool">
+  True if task status is completed
+</ResponseField>
+
+### is_problematic
+
+Check if task has a problematic status.
+
+```python
+if task.is_problematic:
+    print("Task needs attention")
+```
+
+<ResponseField name="problematic" type="bool">
+  True if task status is paused, cancelled, or error
+</ResponseField>
+
+## Methods
+
+### add_tools()
+
+Add tools to the task.
+
+```python
+task.add_tools([tool1, tool2])
+```
+
+<ParamField path="tools" type="Union[Any, List[Any]]" required>
+  Single tool or list of tools to add
+</ParamField>
+
+### remove_tools()
+
+Remove tools from the task.
+
+```python
+task.remove_tools(["tool_name", tool_function])
+```
+
+<ParamField path="tools" type="Union[str, List[str], Any, List[Any]]" required>
+  Tool names (strings) or tool objects to remove
+</ParamField>
+
+### get_tool_defs()
+
+Get tool definitions for registered tools.
+
+```python
+defs = task.get_tool_defs()
+```
+
+<ResponseField name="definitions" type="List[ToolDefinition]">
+  List of tool definitions from the Task's ToolManager
+</ResponseField>
+
+### get_cache_stats()
+
+Get cache statistics for this task.
+
+```python
+stats = task.get_cache_stats()
+```
+
+<ResponseField name="stats" type="Dict[str, Any]">
+  Cache statistics including hit rate and duration
+</ResponseField>
+
+### clear_cache()
+
+Clear all cache entries for this task.
+
+```python
+task.clear_cache()
+```
+
+## Usage Examples
+
+### Basic Task
+
+```python
+from upsonic import Agent, Task
+
+agent = Agent("openai/gpt-4o")
+task = Task("What is the capital of France?")
+result = agent.do(task)
+print(result)  # "The capital of France is Paris."
+```
+
+### Task with Attachments
+
+```python
+from upsonic import Agent, Task
+
+agent = Agent("openai/gpt-4o")
+task = Task(
+    description="Analyze this image and describe what you see",
+    attachments=["photo.jpg"]
+)
+result = agent.do(task)
+```
+
+### Structured Output with Pydantic
+
+```python
+from pydantic import BaseModel
+from upsonic import Agent, Task
+
+class Analysis(BaseModel):
+    summary: str
+    sentiment: str
+    key_points: list[str]
+
+agent = Agent("openai/gpt-4o")
+task = Task(
+    description="Analyze this text",
+    response_format=Analysis
+)
+result = agent.do(task)
+print(result.summary)
+print(result.sentiment)
+print(result.key_points)
+```
+
+### Task with Context
+
+```python
+from upsonic import Agent, Task
+
+context = [
+    "The company was founded in 2020",
+    "We have 50 employees",
+    "Annual revenue is $5M"
+]
+
+task = Task(
+    description="Based on the context, write a company overview",
+    context=context
+)
+
+agent = Agent("openai/gpt-4o")
+result = agent.do(task)
+```
+
+### Task with File Context
+
+```python
+from upsonic import Agent, Task
+
+# Files in context are automatically processed
+task = Task(
+    description="Summarize the documents",
+    context=["report.pdf", "analysis.docx"]
+)
+
+agent = Agent("openai/gpt-4o")
+result = agent.do(task)
+```
+
+### Task with Custom Tools
+
+```python
+from upsonic import Agent, Task
+
+def calculate_roi(revenue: float, cost: float) -> float:
+    """Calculate return on investment."""
+    return ((revenue - cost) / cost) * 100
+
+task = Task(
+    description="Calculate ROI for revenue $100k and cost $60k",
+    tools=[calculate_roi]
+)
+
+agent = Agent("openai/gpt-4o")
+result = agent.do(task)
+```
+
+### Task with Caching
+
+```python
+from upsonic import Agent, Task
+
+agent = Agent("openai/gpt-4o")
+
+task = Task(
+    description="What is quantum computing?",
+    enable_cache=True,
+    cache_threshold=0.8,
+    cache_duration_minutes=120
+)
+
+# First call - hits the LLM
+result1 = agent.do(task)
+print(f"Cache hit: {task.cache_hit}")  # False
+
+# Similar query - cache hit
+task2 = Task(
+    description="Explain quantum computing",
+    enable_cache=True,
+    cache_threshold=0.8
+)
+result2 = agent.do(task2)
+print(f"Cache hit: {task2.cache_hit}")  # True (if similar enough)
+```
+
+### Task with Guardrails
+
+```python
+from upsonic import Agent, Task
+
+def validate_response(response: str) -> bool:
+    """Ensure response mentions specific topics."""
+    return "security" in response.lower() and "encryption" in response.lower()
+
+task = Task(
+    description="Explain how to secure user data",
+    guardrail=validate_response,
+    guardrail_retries=3
+)
+
+agent = Agent("openai/gpt-4o")
+result = agent.do(task)  # Retries up to 3 times if validation fails
+```
+
+### RAG Task with Vector Search
+
+```python
+from upsonic import Agent, Task, KnowledgeBase
+
+kb = KnowledgeBase(
+    sources=["docs/"],
+    vectordb=chroma_provider,
+    embedding_provider=openai_embedding
+)
+
+task = Task(
+    description="How do I configure authentication?",
+    context=[kb],
+    vector_search_top_k=5,
+    vector_search_similarity_threshold=0.7,
+    vector_search_filter={"section": "authentication"}
+)
+
+agent = Agent("openai/gpt-4o")
+result = agent.do(task)
+```
+
+### Multi-Step Task List
+
+```python
+from upsonic import Agent, Task
+
+tasks = [
+    Task("Step 1: Analyze the requirements"),
+    Task("Step 2: Design the architecture"),
+    Task("Step 3: Create implementation plan")
+]
+
+agent = Agent("openai/gpt-4o")
+results = agent.do(tasks)  # Execute all tasks
+
+for task, result in zip(tasks, results):
+    print(f"{task.description}: {result}")
+```
+
+## Serialization
+
+### to_dict()
+
+Convert task to dictionary.
+
+```python
+data = task.to_dict(serialize_flag=False)
+```
+
+<ParamField path="serialize_flag" type="bool" default="False">
+  If True, use cloudpickle for tools and complex objects
+</ParamField>
+
+<ResponseField name="data" type="Dict[str, Any]">
+  Dictionary representation of the task
+</ResponseField>
+
+### from_dict()
+
+Restore task from dictionary.
+
+```python
+task = Task.from_dict(data, deserialize_flag=False)
+```
+
+<ParamField path="data" type="Dict[str, Any]" required>
+  Dictionary containing task data
+</ParamField>
+
+<ParamField path="deserialize_flag" type="bool" default="False">
+  If True, use cloudpickle to deserialize complex objects
+</ParamField>
+
+<ResponseField name="task" type="Task">
+  Reconstructed Task instance
+</ResponseField>
+
+## Related Classes
+
+- [Agent](/api/agent) - Execute tasks
+- [KnowledgeBase](/api/knowledge-base) - Provide context via RAG
+- [Team](/api/team) - Multi-agent task execution

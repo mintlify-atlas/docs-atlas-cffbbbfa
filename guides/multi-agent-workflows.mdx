@@ -1,0 +1,442 @@
+---
+title: Multi-Agent Workflows
+description: Team coordination patterns, delegation, and multi-agent collaboration
+---
+
+# Multi-Agent Workflows
+
+Learn how to build sophisticated multi-agent systems using the Upsonic Team framework. Coordinate multiple specialized agents to solve complex tasks through collaboration.
+
+## Team Architecture
+
+The `Team` class enables multi-agent operations with three coordination modes:
+
+- **Sequential**: Agents work on tasks one after another
+- **Coordinate**: A leader agent delegates tasks to team members
+- **Route**: A router selects the best agent for the entire workload
+
+Reference: `src/upsonic/team/team.py:18-24`
+
+## Creating a Team
+
+<Steps>
+  <Step title="Define Specialized Agents">
+    Create agents with distinct roles and capabilities:
+
+    ```python
+    from upsonic import Agent, Task, Team
+
+    researcher = Agent(
+        model="openai/gpt-4o",
+        name="Researcher",
+        role="Research Specialist",
+        goal="Find accurate information and data"
+    )
+
+    writer = Agent(
+        model="openai/gpt-4o",
+        name="Writer",
+        role="Content Writer",
+        goal="Create clear and engaging content"
+    )
+
+    editor = Agent(
+        model="openai/gpt-4o",
+        name="Editor",
+        role="Content Editor",
+        goal="Refine and polish written content"
+    )
+    ```
+  </Step>
+
+  <Step title="Create the Team">
+    Combine agents into a team with a coordination mode:
+
+    ```python
+    team = Team(
+        entities=[researcher, writer, editor],
+        mode="sequential",
+        name="Content Creation Team"
+    )
+    ```
+  </Step>
+
+  <Step title="Execute Team Workflow">
+    Define tasks and let the team execute them:
+
+    ```python
+    tasks = [
+        Task(description="Research AI safety developments"),
+        Task(description="Write a blog post about AI safety"),
+        Task(description="Edit and refine the blog post")
+    ]
+
+    result = team.do(tasks)
+    print(result)
+    ```
+  </Step>
+</Steps>
+
+## Team Modes
+
+### Sequential Mode
+
+Agents execute tasks in order, with each agent building on previous results.
+
+```python
+team = Team(
+    entities=[researcher, writer, editor],
+    mode="sequential"
+)
+
+# Tasks are automatically assigned to appropriate agents
+tasks = [
+    Task(description="Research quantum computing"),
+    Task(description="Write article about quantum computing"),
+    Task(description="Polish the article for publication")
+]
+
+result = team.do(tasks)
+```
+
+Reference: `tests/doc_examples/team/modes/sequential.py`
+
+**How it works:**
+1. Each task is assigned to the most suitable agent based on their role and goal
+2. Agents execute tasks sequentially
+3. Context from previous tasks is shared with subsequent agents
+4. Final result is combined or returned from last task
+
+Reference: `src/upsonic/team/team.py:246-320`
+
+### Coordinate Mode
+
+A leader agent orchestrates and delegates work to team members.
+
+```python
+leader = Agent(
+    model="openai/gpt-4o",
+    name="Project Manager",
+    role="Team Coordinator",
+    goal="Coordinate team efforts efficiently"
+)
+
+team = Team(
+    entities=[researcher, writer, editor],
+    mode="coordinate",
+    leader=leader
+)
+
+tasks = [
+    Task(description="Create comprehensive report on AI trends"),
+    Task(description="Include market analysis and technical details")
+]
+
+result = team.do(tasks)
+```
+
+**How it works:**
+1. Leader analyzes the mission objectives
+2. Leader delegates subtasks to appropriate team members
+3. Leader synthesizes results into final output
+4. Team members act as tools for the leader
+
+Reference: `src/upsonic/team/team.py:322-369`
+
+<Tip>
+If you don't provide a leader agent, one will be created automatically using the `model` parameter.
+</Tip>
+
+### Route Mode
+
+A router selects the single best agent for the entire task.
+
+```python
+team = Team(
+    entities=[researcher, writer, data_analyst],
+    mode="route"
+)
+
+# Router selects the most appropriate agent
+task = Task(description="Analyze customer feedback data")
+result = team.do(task)
+```
+
+**How it works:**
+1. Router analyzes the task requirements
+2. Router selects the most qualified agent
+3. Selected agent executes the entire task
+4. Result is returned directly
+
+Reference: `src/upsonic/team/team.py:370-420`
+
+## Advanced Team Configuration
+
+### Shared Memory
+
+Enable conversation history across all team members:
+
+```python
+from upsonic.storage import InMemoryStorage
+from upsonic.storage.memory import Memory
+
+storage = InMemoryStorage()
+memory = Memory(
+    storage=storage,
+    full_session_memory=True,
+    summary_memory=True
+)
+
+team = Team(
+    entities=[researcher, writer],
+    memory=memory,  # Shared across all agents
+    mode="sequential"
+)
+```
+
+Reference: `src/upsonic/team/team.py:83-109`
+
+### Cross-Team Communication
+
+Allow agents to consult with each other:
+
+```python
+team = Team(
+    entities=[researcher, writer, editor],
+    mode="sequential",
+    ask_other_team_members=True  # Agents added as tools
+)
+```
+
+Reference: `src/upsonic/team/team.py:34`
+
+### Nested Teams
+
+Teams can contain other teams for hierarchical workflows:
+
+```python
+# Create sub-teams
+research_team = Team(
+    entities=[senior_researcher, junior_researcher],
+    name="Research Team",
+    mode="coordinate"
+)
+
+creation_team = Team(
+    entities=[writer, designer],
+    name="Creation Team",
+    mode="coordinate"
+)
+
+# Create parent team
+project_team = Team(
+    entities=[research_team, creation_team, project_manager],
+    name="Project Team",
+    mode="coordinate"
+)
+
+result = project_team.do(tasks)
+```
+
+## Context Sharing
+
+Teams automatically share context between agents:
+
+```python
+# Context includes:
+# - Previous task results
+# - Agent outputs from earlier steps
+# - Shared memory conversations
+# - Task dependencies
+
+tasks = [
+    Task(description="Research topic X"),
+    Task(description="Based on the research, write an article"),  # References previous
+    Task(description="Edit the article for clarity")  # References previous
+]
+```
+
+Reference: `src/upsonic/team/context_sharing.py`
+
+## Task Assignment
+
+The framework intelligently assigns tasks to agents:
+
+```python
+# Automatic assignment based on:
+# 1. Agent role and goal
+# 2. Task description
+# 3. Previous task context
+# 4. Agent capabilities
+
+task_assignment = TaskAssignment()
+selected_agent = await task_assignment.select_entity_for_task(
+    task=current_task,
+    context=selection_context,
+    entities_registry=entities,
+    entity_names=names,
+    entity_configurations=configs
+)
+```
+
+Reference: `src/upsonic/team/task_assignment.py`
+
+## Delegation Patterns
+
+### Dynamic Delegation Tool
+
+In coordinate mode, a delegation tool is automatically created:
+
+```python
+# Leader can call:
+# delegate_task(agent_name: str, task_description: str)
+
+# Example delegation flow:
+# 1. Leader receives mission
+# 2. Leader analyzes requirements
+# 3. Leader delegates: "researcher, find data about X"
+# 4. Leader delegates: "writer, create report from this data"
+# 5. Leader synthesizes final result
+```
+
+Reference: `src/upsonic/team/delegation_manager.py`
+
+## Streaming Team Output
+
+### Synchronous Streaming
+
+```python
+for chunk in team.stream(tasks):
+    print(chunk, end="", flush=True)
+```
+
+### Asynchronous Streaming
+
+```python
+async def stream_team():
+    async for chunk in team.astream(tasks):
+        print(chunk, end="", flush=True)
+```
+
+Reference: `src/upsonic/team/team.py:434-619`
+
+<Note>
+In coordinate mode, only the leader's output is streamed. Delegated member outputs are not streamed.
+</Note>
+
+## Best Practices
+
+<Tip>
+**Distinct Roles**: Give each agent a clearly defined, non-overlapping role. This helps the task assignment system make better decisions.
+
+```python
+# Good: Specific roles
+researcher = Agent(role="Data Researcher", goal="Find factual data")
+writer = Agent(role="Content Writer", goal="Create engaging narratives")
+
+# Bad: Generic roles
+agent1 = Agent(role="Helper", goal="Help with tasks")
+agent2 = Agent(role="Assistant", goal="Assist with work")
+```
+</Tip>
+
+<Tip>
+**Task Descriptions**: Write clear task descriptions that help the framework assign them correctly:
+
+```python
+# Good: Clear and specific
+Task(description="Research the market size for AI safety tools in 2024")
+Task(description="Write a 500-word executive summary of the research")
+
+# Bad: Vague
+Task(description="Do some research")
+Task(description="Write something")
+```
+</Tip>
+
+<Warning>
+**Memory Overhead**: Sharing memory across many agents can increase token usage. Use `num_last_messages` to limit history size:
+
+```python
+memory = Memory(
+    storage=storage,
+    full_session_memory=True,
+    num_last_messages=10  # Keep only recent context
+)
+```
+</Warning>
+
+<Tip>
+**Debug Mode**: Enable debug logging to see task assignments:
+
+```python
+team = Team(
+    entities=[researcher, writer],
+    mode="sequential",
+    debug=True,
+    debug_level=2
+)
+```
+</Tip>
+
+## Common Patterns
+
+### Content Production Pipeline
+
+```python
+researcher = Agent(role="Researcher", goal="Gather information")
+writer = Agent(role="Writer", goal="Create content")
+editor = Agent(role="Editor", goal="Refine content")
+seo_specialist = Agent(role="SEO Specialist", goal="Optimize for search")
+
+team = Team(
+    entities=[researcher, writer, editor, seo_specialist],
+    mode="sequential"
+)
+
+tasks = [
+    Task("Research AI trends"),
+    Task("Write blog post"),
+    Task("Edit for clarity"),
+    Task("Add SEO keywords")
+]
+```
+
+### Customer Support Team
+
+```python
+triage_agent = Agent(role="Triage", goal="Categorize inquiries")
+technical_support = Agent(role="Technical Support", goal="Solve technical issues")
+billing_support = Agent(role="Billing", goal="Handle billing questions")
+
+team = Team(
+    entities=[triage_agent, technical_support, billing_support],
+    mode="route"  # Route to appropriate specialist
+)
+```
+
+### Research Team
+
+```python
+lead_researcher = Agent(
+    role="Lead Researcher",
+    goal="Coordinate research efforts"
+)
+
+data_collector = Agent(role="Data Collector", goal="Gather datasets")
+statistician = Agent(role="Statistician", goal="Analyze data")
+report_writer = Agent(role="Report Writer", goal="Document findings")
+
+team = Team(
+    entities=[data_collector, statistician, report_writer],
+    mode="coordinate",
+    leader=lead_researcher
+)
+```
+
+## Next Steps
+
+- [Building Agents](/guides/building-agents) - Learn to create specialized agents
+- [Custom Tools](/guides/custom-tools) - Add capabilities to agents
+- [Memory Management](/guides/memory-management) - Share context effectively
+- [Safety Policies](/guides/safety-policies) - Add guardrails to teams

@@ -1,0 +1,427 @@
+---
+title: Agent
+description: Complete API reference for the Agent class - the comprehensive, high-level AI Agent
+---
+
+## Overview
+
+A comprehensive, high-level AI Agent that integrates all framework components including model abstraction, tool handling, streaming execution, memory management, context management, caching, safety policies, and more.
+
+## Class Definition
+
+```python
+from upsonic import Agent
+
+agent = Agent(
+    model="openai/gpt-4o",
+    name="MyAgent",
+    memory=memory,
+    tools=[tool1, tool2]
+)
+```
+
+## Constructor Parameters
+
+<ParamField path="model" type="Union[str, Model]" default="openai/gpt-4o">
+  Model identifier (e.g., "openai/gpt-4o", "anthropic/claude-sonnet-4-20250514") or Model instance
+</ParamField>
+
+<ParamField path="name" type="str" default="None">
+  Agent name for identification and display
+</ParamField>
+
+<ParamField path="memory" type="Memory" default="None">
+  Memory instance for conversation history and session management
+</ParamField>
+
+<ParamField path="db" type="DatabaseBase" default="None">
+  Database instance (overrides memory if provided)
+</ParamField>
+
+<ParamField path="session_id" type="str" default="None">
+  Session identifier for tracking conversations
+</ParamField>
+
+<ParamField path="user_id" type="str" default="None">
+  User identifier for multi-user scenarios
+</ParamField>
+
+<ParamField path="debug" type="bool" default="False">
+  Enable debug logging for troubleshooting
+</ParamField>
+
+<ParamField path="debug_level" type="int" default="1">
+  Debug verbosity level (1 = standard, 2 = detailed). Only used when debug=True
+</ParamField>
+
+<ParamField path="print" type="bool" default="None">
+  Enable printing for do() method. If None, uses UPSONIC_AGENT_PRINT env variable
+</ParamField>
+
+<ParamField path="system_prompt" type="str" default="None">
+  Custom system prompt to guide agent behavior
+</ParamField>
+
+<ParamField path="role" type="str" default="None">
+  Agent role description (e.g., "Software Engineer", "Data Analyst")
+</ParamField>
+
+<ParamField path="goal" type="str" default="None">
+  Agent's primary goal or objective
+</ParamField>
+
+<ParamField path="instructions" type="str" default="None">
+  Specific instructions for task execution
+</ParamField>
+
+<ParamField path="tools" type="list" default="None">
+  List of tools to register with this agent (functions, ToolKits, or other agents)
+</ParamField>
+
+<ParamField path="enable_thinking_tool" type="bool" default="False">
+  Enable the plan_and_execute orchestrated thinking tool
+</ParamField>
+
+<ParamField path="show_tool_calls" type="bool" default="True">
+  Display tool calls during execution
+</ParamField>
+
+<ParamField path="tool_call_limit" type="int" default="100">
+  Maximum tool calls per execution to prevent infinite loops
+</ParamField>
+
+<ParamField path="reflection" type="bool" default="False">
+  Enable reflection and self-evaluation capabilities
+</ParamField>
+
+<ParamField path="context_management" type="bool" default="False">
+  Enable automatic context window management and pruning
+</ParamField>
+
+<ParamField path="context_management_keep_recent" type="int" default="5">
+  Number of recent messages to preserve when pruning context
+</ParamField>
+
+<ParamField path="retry" type="int" default="1">
+  Number of retry attempts for failed operations
+</ParamField>
+
+<ParamField path="user_policy" type="Union[Policy, List[Policy]]" default="None">
+  User input safety policy or list of policies for content filtering
+</ParamField>
+
+<ParamField path="agent_policy" type="Union[Policy, List[Policy]]" default="None">
+  Agent output safety policy or list of policies
+</ParamField>
+
+<ParamField path="tool_policy_pre" type="Union[Policy, List[Policy]]" default="None">
+  Tool safety policy for pre-execution validation
+</ParamField>
+
+<ParamField path="tool_policy_post" type="Union[Policy, List[Policy]]" default="None">
+  Tool safety policy for post-execution validation
+</ParamField>
+
+<ParamField path="reasoning_effort" type="Literal['low', 'medium', 'high']" default="None">
+  Reasoning effort level for OpenAI models
+</ParamField>
+
+<ParamField path="thinking_enabled" type="bool" default="None">
+  Enable extended thinking for Anthropic/Google models
+</ParamField>
+
+<ParamField path="culture" type="Culture" default="None">
+  Culture instance defining agent behavior and communication guidelines
+</ParamField>
+
+<ParamField path="workspace" type="str" default="None">
+  Path to workspace folder containing AGENTS.md configuration
+</ParamField>
+
+## Core Methods
+
+### do()
+
+Execute a task synchronously and return the result.
+
+```python
+result = agent.do(task)
+```
+
+<ParamField path="task" type="Union[str, Task, List[Union[str, Task]]]" required>
+  Task object, string description, or list of tasks to execute
+</ParamField>
+
+<ResponseField name="result" type="Any">
+  The task result - typically a string, but can be a structured Pydantic model if response_format is specified
+</ResponseField>
+
+**Example:**
+
+```python
+from upsonic import Agent, Task
+
+agent = Agent("openai/gpt-4o")
+task = Task("What is 2 + 2?")
+result = agent.do(task)
+print(result)  # "4"
+```
+
+### do_async()
+
+Execute a task asynchronously.
+
+```python
+result = await agent.do_async(task)
+```
+
+<ParamField path="task" type="Union[str, Task, List[Union[str, Task]]]" required>
+  Task object, string description, or list of tasks
+</ParamField>
+
+<ParamField path="return_output" type="bool" default="False">
+  If True, return full AgentRunOutput instead of just the content
+</ParamField>
+
+<ResponseField name="result" type="Union[Any, AgentRunOutput]">
+  Task result or full AgentRunOutput if return_output=True
+</ResponseField>
+
+### stream()
+
+Stream task execution synchronously with real-time output.
+
+```python
+for chunk in agent.stream(task):
+    print(chunk, end="", flush=True)
+```
+
+<ParamField path="task" type="Union[str, Task]" required>
+  Task object or string description
+</ParamField>
+
+<ParamField path="events" type="bool" default="True">
+  If True, yield AgentStreamEvent objects; if False, yield text strings only
+</ParamField>
+
+<ResponseField name="iterator" type="Iterator[Union[str, AgentStreamEvent]]">
+  Iterator yielding text chunks or event objects
+</ResponseField>
+
+### astream()
+
+Stream task execution asynchronously.
+
+```python
+async for chunk in agent.astream(task):
+    print(chunk, end="", flush=True)
+```
+
+<ParamField path="task" type="Union[str, Task]" required>
+  Task object or string description
+</ParamField>
+
+<ParamField path="events" type="bool" default="True">
+  If True, yield AgentStreamEvent objects; if False, yield text strings only
+</ParamField>
+
+<ResponseField name="async_iterator" type="AsyncIterator[Union[str, AgentStreamEvent]]">
+  Async iterator yielding text chunks or event objects
+</ResponseField>
+
+### add_tools()
+
+Dynamically add tools to the agent after initialization.
+
+```python
+agent.add_tools([tool1, tool2])
+```
+
+<ParamField path="tools" type="Union[Any, List[Any]]" required>
+  Single tool or list of tools to add (functions, ToolKits, agents, etc.)
+</ParamField>
+
+### cancel_run()
+
+Cancel a running task execution.
+
+```python
+agent.cancel_run(run_id="abc123")
+```
+
+<ParamField path="run_id" type="str" default="None">
+  ID of the run to cancel. If None, cancels the current run.
+</ParamField>
+
+<ResponseField name="success" type="bool">
+  True if the run was found and cancelled
+</ResponseField>
+
+## Properties
+
+### agent_id
+
+```python
+id = agent.agent_id
+```
+
+<ResponseField name="agent_id" type="str">
+  Unique identifier for this agent instance
+</ResponseField>
+
+### session_id
+
+```python
+session = agent.session_id
+```
+
+<ResponseField name="session_id" type="str">
+  Current session identifier from memory or db
+</ResponseField>
+
+### user_id
+
+```python
+user = agent.user_id
+```
+
+<ResponseField name="user_id" type="str">
+  Current user identifier from memory or db
+</ResponseField>
+
+## Usage Methods
+
+### get_run_output()
+
+Get the complete output from the last execution.
+
+```python
+output = agent.get_run_output()
+```
+
+<ResponseField name="output" type="AgentRunOutput">
+  Complete run output with messages, usage, tool calls, etc.
+</ResponseField>
+
+### get_session_usage()
+
+Get aggregated usage statistics for the current session.
+
+```python
+usage = agent.get_session_usage()
+print(f"Total cost: ${usage.total_cost}")
+print(f"Input tokens: {usage.total_input_tokens}")
+```
+
+<ResponseField name="usage" type="RunUsage">
+  Aggregated usage metrics including tokens and costs
+</ResponseField>
+
+### get_cache_stats()
+
+Get cache performance statistics.
+
+```python
+stats = agent.get_cache_stats()
+```
+
+<ResponseField name="stats" type="Dict[str, Any]">
+  Cache statistics including hit rate and total entries
+</ResponseField>
+
+### clear_cache()
+
+Clear the agent's session cache.
+
+```python
+agent.clear_cache()
+```
+
+## Advanced Examples
+
+### Multi-Tool Agent
+
+```python
+from upsonic import Agent, Task
+
+def calculate(a: int, b: int) -> int:
+    """Add two numbers."""
+    return a + b
+
+def search_web(query: str) -> str:
+    """Search the web."""
+    return f"Results for {query}"
+
+agent = Agent(
+    model="openai/gpt-4o",
+    name="Assistant",
+    tools=[calculate, search_web],
+    show_tool_calls=True
+)
+
+task = Task("What is 25 + 17, and search for Python tutorials")
+result = agent.do(task)
+```
+
+### Agent with Memory
+
+```python
+from upsonic import Agent, Memory, InMemoryStorage
+
+storage = InMemoryStorage()
+memory = Memory(
+    storage=storage,
+    full_session_memory=True
+)
+
+agent = Agent(
+    model="openai/gpt-4o",
+    memory=memory
+)
+
+# First conversation
+agent.do("My name is Alice")
+
+# Agent remembers
+result = agent.do("What's my name?")  # "Your name is Alice"
+```
+
+### Streaming with Events
+
+```python
+from upsonic import Agent, Task
+
+agent = Agent("openai/gpt-4o")
+task = Task("Write a short poem")
+
+for event in agent.stream(task, events=True):
+    if event.event_type == "text_delta":
+        print(event.data, end="", flush=True)
+    elif event.event_type == "tool_call":
+        print(f"\nCalling tool: {event.data['name']}")
+```
+
+### Safety Policies
+
+```python
+from upsonic import Agent, Task
+from upsonic.safety_engine import AdultContentPolicy
+
+policy = AdultContentPolicy()
+
+agent = Agent(
+    model="openai/gpt-4o",
+    user_policy=policy,  # Filter user inputs
+    agent_policy=policy  # Filter agent outputs
+)
+
+task = Task("Tell me about AI ethics")
+result = agent.do(task)
+```
+
+## Related Classes
+
+- [Task](/api/task) - Task definition and execution
+- [AutonomousAgent](/api/autonomous-agent) - Agent with filesystem and shell tools
+- [Team](/api/team) - Multi-agent coordination
+- [Memory](/api/memory) - Conversation history management

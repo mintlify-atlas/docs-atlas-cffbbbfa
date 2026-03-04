@@ -1,0 +1,533 @@
+---
+title: Team
+description: Complete API reference for the Team class - multi-agent coordination and workflows
+---
+
+## Overview
+
+The Team class enables multi-agent coordination, allowing multiple agents (or even nested teams) to work together on tasks. It supports three operational modes: sequential execution, coordinated delegation, and intelligent routing.
+
+## Class Definition
+
+```python
+from upsonic import Team, Agent
+
+agent1 = Agent("openai/gpt-4o", role="Researcher")
+agent2 = Agent("openai/gpt-4o", role="Writer")
+
+team = Team(
+    entities=[agent1, agent2],
+    mode="sequential"
+)
+```
+
+## Constructor Parameters
+
+<ParamField path="entities" type="List[Union[Agent, Team]]" required>
+  List of Agent and/or Team instances to use as team members. Enables hierarchical workflows.
+</ParamField>
+
+<ParamField path="tasks" type="List[Task]" default="None">
+  List of tasks to execute (can also be provided to do() method)
+</ParamField>
+
+<ParamField path="name" type="str" default="None">
+  Display name for this team (used as entity ID when nested in another team)
+</ParamField>
+
+<ParamField path="role" type="str" default="None">
+  Role description for this team (used in coordinator prompts when nested)
+</ParamField>
+
+<ParamField path="goal" type="str" default="None">
+  Goal description for this team (used in coordinator prompts when nested)
+</ParamField>
+
+<ParamField path="mode" type="Literal['sequential', 'coordinate', 'route']" default="sequential">
+  Operational mode for task execution:
+  - **sequential**: Execute tasks one by one, automatically selecting best agent for each task
+  - **coordinate**: Leader agent delegates subtasks to team members
+  - **route**: Router agent analyzes the request and routes to best specialist
+</ParamField>
+
+<ParamField path="model" type="Any" default="None">
+  Model for internally-created leader/router agents when leader/router not provided
+</ParamField>
+
+<ParamField path="leader" type="Agent" default="None">
+  Agent to use as coordinator in 'coordinate' mode. If None, created from model.
+</ParamField>
+
+<ParamField path="router" type="Agent" default="None">
+  Agent to use as router in 'route' mode. If None, created from model.
+</ParamField>
+
+<ParamField path="response_format" type="Any" default="str">
+  The response format for the final task output
+</ParamField>
+
+<ParamField path="ask_other_team_members" type="bool" default="False">
+  Automatically add other agents as tools (agents can ask each other for help)
+</ParamField>
+
+<ParamField path="memory" type="Memory" default="None">
+  Memory instance for team operations. Propagated to all agents if they don't have memory.
+</ParamField>
+
+<ParamField path="debug" type="bool" default="False">
+  Enable debug logging
+</ParamField>
+
+<ParamField path="debug_level" type="int" default="1">
+  Debug verbosity level (1 = standard, 2 = detailed)
+</ParamField>
+
+<ParamField path="agents" type="List[Union[Agent, Team]]" default="None">
+  Backward-compatible alias for entities parameter
+</ParamField>
+
+## Execution Methods
+
+### do()
+
+Execute team workflow synchronously.
+
+```python
+result = team.do(tasks)
+```
+
+<ParamField path="tasks" type="Union[List[Task], Task]" default="None">
+  Task(s) to execute. If not provided, uses tasks from initialization.
+</ParamField>
+
+<ResponseField name="result" type="Any">
+  The final result after task execution and combination
+</ResponseField>
+
+### do_async()
+
+Execute team workflow asynchronously.
+
+```python
+result = await team.do_async(task)
+```
+
+<ParamField path="task" type="Union[str, Task]" required>
+  Task object or string description to execute
+</ParamField>
+
+<ResponseField name="result" type="Any">
+  The final result from the multi-agent operation
+</ResponseField>
+
+### ado()
+
+Async alias for do_async().
+
+```python
+result = await team.ado(task)
+```
+
+### print_do()
+
+Execute workflow and enable printing during execution.
+
+```python
+result = team.print_do(tasks)
+```
+
+<ParamField path="tasks" type="Union[List[Task], Task]" default="None">
+  Task(s) to execute
+</ParamField>
+
+<ResponseField name="result" type="Any">
+  The final result with streaming output enabled
+</ResponseField>
+
+### stream()
+
+Stream task execution synchronously.
+
+```python
+for chunk in team.stream(task):
+    print(chunk, end="", flush=True)
+```
+
+<ParamField path="tasks" type="Union[List[Task], Task, str]" default="None">
+  Task(s) or string description to execute
+</ParamField>
+
+<ParamField path="debug" type="bool" default="False">
+  Enable debug mode for streaming
+</ParamField>
+
+<ResponseField name="iterator" type="Iterator[str]">
+  Iterator yielding text chunks as they arrive
+</ResponseField>
+
+### astream()
+
+Stream task execution asynchronously.
+
+```python
+async for chunk in team.astream(task):
+    print(chunk, end="", flush=True)
+```
+
+<ParamField path="tasks" type="Union[List[Task], Task, str]" default="None">
+  Task(s) or string description to execute
+</ParamField>
+
+<ParamField path="debug" type="bool" default="False">
+  Enable debug mode
+</ParamField>
+
+<ResponseField name="async_iterator" type="AsyncIterator[str]">
+  Async iterator yielding text chunks
+</ResponseField>
+
+## Utility Methods
+
+### add_tool()
+
+Add team members as tools to all tasks.
+
+```python
+team.add_tool()
+```
+
+Enables agents to ask each other for help by calling them as tools.
+
+### as_mcp()
+
+Expose the team as an MCP server.
+
+```python
+server = team.as_mcp(name="MyTeam")
+server.run(transport="stdio")
+```
+
+<ParamField path="name" type="str" default="None">
+  MCP server name. Defaults to team name or "Upsonic Team"
+</ParamField>
+
+<ResponseField name="server" type="FastMCP">
+  FastMCP server instance ready to run
+</ResponseField>
+
+### get_entity_id()
+
+Get display-friendly entity ID.
+
+```python
+entity_id = team.get_entity_id()
+```
+
+<ResponseField name="id" type="str">
+  Team name or auto-generated ID
+</ResponseField>
+
+## Properties
+
+### agents
+
+Backward-compatible alias for entities.
+
+```python
+agents = team.agents  # Same as team.entities
+```
+
+<ResponseField name="agents" type="List[Union[Agent, Team]]">
+  List of team members
+</ResponseField>
+
+### leader_agent
+
+Get the leader agent (coordinate mode).
+
+```python
+leader = team.leader_agent
+```
+
+<ResponseField name="leader" type="Agent">
+  Leader agent instance or None
+</ResponseField>
+
+## Operational Modes
+
+### Sequential Mode
+
+Tasks are executed one by one, with automatic agent selection for each task based on agent roles and capabilities.
+
+```python
+from upsonic import Team, Agent, Task
+
+researcher = Agent("openai/gpt-4o", role="Research Specialist")
+writer = Agent("openai/gpt-4o", role="Content Writer")
+editor = Agent("openai/gpt-4o", role="Editor")
+
+team = Team(
+    entities=[researcher, writer, editor],
+    mode="sequential"
+)
+
+tasks = [
+    Task("Research the history of AI"),
+    Task("Write a blog post about AI history"),
+    Task("Edit and polish the blog post")
+]
+
+result = team.do(tasks)
+```
+
+**How it works:**
+- Each task is assigned to the most suitable agent
+- Tasks execute in order
+- Results are automatically combined at the end
+- Context from previous tasks is available to later tasks
+
+### Coordinate Mode
+
+A leader agent coordinates the team, delegating subtasks to team members.
+
+```python
+from upsonic import Team, Agent, Task
+
+coder = Agent("openai/gpt-4o", role="Python Developer")
+tester = Agent("openai/gpt-4o", role="QA Engineer")
+documenter = Agent("openai/gpt-4o", role="Technical Writer")
+
+leader = Agent(
+    "openai/gpt-4o",
+    role="Tech Lead",
+    goal="Coordinate the team to build quality software"
+)
+
+team = Team(
+    entities=[coder, tester, documenter],
+    mode="coordinate",
+    leader=leader
+)
+
+tasks = [
+    Task("Build a calculator function"),
+    Task("Test it thoroughly"),
+    Task("Write API documentation")
+]
+
+result = team.do(tasks)
+```
+
+**How it works:**
+- Leader receives all tasks and creates a plan
+- Leader delegates subtasks to appropriate team members
+- Leader synthesizes results into final output
+- Only leader's output is streamed (not delegated member outputs)
+
+### Route Mode
+
+A router agent analyzes the request and routes it to the best specialist.
+
+```python
+from upsonic import Team, Agent, Task
+
+python_expert = Agent(
+    "openai/gpt-4o",
+    role="Python Expert",
+    goal="Help with Python programming"
+)
+
+javascript_expert = Agent(
+    "openai/gpt-4o",
+    role="JavaScript Expert",
+    goal="Help with JavaScript programming"
+)
+
+router = Agent(
+    "openai/gpt-4o",
+    role="Technical Router",
+    goal="Route questions to the right expert"
+)
+
+team = Team(
+    entities=[python_expert, javascript_expert],
+    mode="route",
+    router=router
+)
+
+task = Task("How do I use async/await in Python?")
+result = team.do(task)  # Routed to python_expert
+```
+
+**How it works:**
+- Router analyzes the request
+- Router selects the best specialist
+- Selected agent executes the task
+- Result is returned directly
+
+## Advanced Examples
+
+### Hierarchical Teams (Nested Teams)
+
+```python
+from upsonic import Team, Agent, Task
+
+# Backend team
+backend_dev = Agent("openai/gpt-4o", role="Backend Developer")
+db_admin = Agent("openai/gpt-4o", role="Database Administrator")
+
+backend_team = Team(
+    entities=[backend_dev, db_admin],
+    name="Backend Team",
+    role="Backend Development",
+    mode="sequential"
+)
+
+# Frontend team
+frontend_dev = Agent("openai/gpt-4o", role="Frontend Developer")
+ux_designer = Agent("openai/gpt-4o", role="UX Designer")
+
+frontend_team = Team(
+    entities=[frontend_dev, ux_designer],
+    name="Frontend Team",
+    role="Frontend Development",
+    mode="sequential"
+)
+
+# Main team with nested teams
+project_manager = Agent("openai/gpt-4o", role="Project Manager")
+
+main_team = Team(
+    entities=[backend_team, frontend_team, project_manager],
+    mode="coordinate",
+    leader=project_manager
+)
+
+task = Task("Build a user authentication system with a React frontend")
+result = main_team.do(task)
+```
+
+### Team with Shared Memory
+
+```python
+from upsonic import Team, Agent, Memory, InMemoryStorage
+
+storage = InMemoryStorage()
+memory = Memory(storage=storage, full_session_memory=True)
+
+agent1 = Agent("openai/gpt-4o", role="Researcher")
+agent2 = Agent("openai/gpt-4o", role="Analyst")
+
+team = Team(
+    entities=[agent1, agent2],
+    memory=memory,
+    mode="sequential"
+)
+
+# All agents share the same conversation history
+team.do("Research the topic of quantum computing")
+team.do("Analyze the research findings")  # Has access to previous context
+```
+
+### Inter-Agent Communication
+
+```python
+from upsonic import Team, Agent, Task
+
+expert1 = Agent("openai/gpt-4o", role="Security Expert")
+expert2 = Agent("openai/gpt-4o", role="Performance Expert")
+expert3 = Agent("openai/gpt-4o", role="Architecture Expert")
+
+team = Team(
+    entities=[expert1, expert2, expert3],
+    ask_other_team_members=True,  # Enable inter-agent communication
+    mode="sequential"
+)
+
+task = Task("Design a scalable, secure API architecture")
+result = team.do(task)
+# Agents can ask each other for input during execution
+```
+
+### Streaming Team Output
+
+```python
+from upsonic import Team, Agent, Task
+
+agent1 = Agent("openai/gpt-4o", role="Writer")
+agent2 = Agent("openai/gpt-4o", role="Editor")
+
+team = Team(
+    entities=[agent1, agent2],
+    mode="sequential"
+)
+
+tasks = [
+    Task("Write a short story about AI"),
+    Task("Edit and improve the story")
+]
+
+# Stream output in real-time
+for chunk in team.stream(tasks):
+    print(chunk, end="", flush=True)
+```
+
+### Team as MCP Server
+
+```python
+from upsonic import Team, Agent
+
+customer_support = Agent("openai/gpt-4o", role="Customer Support")
+technical_support = Agent("openai/gpt-4o", role="Technical Support")
+
+team = Team(
+    entities=[customer_support, technical_support],
+    name="Support Team",
+    mode="route"
+)
+
+# Expose as MCP server
+server = team.as_mcp(name="SupportBot")
+server.run(transport="stdio")
+```
+
+### Multi-Model Team
+
+```python
+from upsonic import Team, Agent, Task
+
+# Different models for different specialties
+code_agent = Agent(
+    "anthropic/claude-sonnet-4-20250514",
+    role="Coder"
+)
+
+analysis_agent = Agent(
+    "openai/o1",  # Reasoning model
+    role="Analyst"
+)
+
+writer_agent = Agent(
+    "openai/gpt-4o",
+    role="Writer"
+)
+
+team = Team(
+    entities=[code_agent, analysis_agent, writer_agent],
+    mode="sequential"
+)
+
+tasks = [
+    Task("Analyze this algorithm's complexity"),
+    Task("Implement the optimized version"),
+    Task("Write documentation")
+]
+
+result = team.do(tasks)
+```
+
+## Related Classes
+
+- [Agent](/api/agent) - Individual agent for team members
+- [Task](/api/task) - Tasks for team execution
+- [Memory](/api/memory) - Shared conversation history

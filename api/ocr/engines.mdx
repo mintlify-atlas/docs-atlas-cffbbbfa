@@ -1,0 +1,293 @@
+---
+title: OCR engines
+description: API reference for OCR engine implementations
+---
+
+## Overview
+
+Upsonic supports multiple OCR engines, each with different strengths and capabilities.
+
+## EasyOCR
+
+Deep learning-based OCR supporting 80+ languages:
+
+```python
+from upsonic.ocr.layer_1.engines import EasyOCREngine
+from upsonic.ocr import OCR
+
+engine = EasyOCREngine(languages=["en"])
+ocr = OCR(layer_1_ocr_engine=engine)
+```
+
+### Constructor
+
+<ParamField path="languages" type="List[str]" default="['en']">
+  List of language codes to recognize (e.g., ["en", "es", "fr"])
+</ParamField>
+
+<ParamField path="gpu" type="bool" default="True">
+  Use GPU acceleration if available
+</ParamField>
+
+<ParamField path="model_storage_directory" type="str" default="None">
+  Directory to store downloaded models
+</ParamField>
+
+### Supported languages
+
+EasyOCR supports 80+ languages including:
+- English (en)
+- Spanish (es)
+- French (fr)
+- German (de)
+- Chinese Simplified (ch_sim)
+- Chinese Traditional (ch_tra)
+- Japanese (ja)
+- Korean (ko)
+- Arabic (ar)
+
+[Full list of supported languages](https://www.jaided.ai/easyocr/)
+
+**Installation:**
+```bash
+pip install "upsonic[ocr]"
+```
+
+## RapidOCR
+
+Fast and lightweight OCR engine:
+
+```python
+from upsonic.ocr.layer_1.engines import RapidOCREngine
+from upsonic.ocr import OCR
+
+engine = RapidOCREngine()
+ocr = OCR(layer_1_ocr_engine=engine)
+```
+
+### Constructor
+
+<ParamField path="use_angle_cls" type="bool" default="True">
+  Enable text angle classification
+</ParamField>
+
+<ParamField path="use_text_det" type="bool" default="True">
+  Enable text detection
+</ParamField>
+
+**Installation:**
+```bash
+pip install "upsonic[ocr]"
+```
+
+## Tesseract
+
+Traditional OCR engine, excellent for English text:
+
+```python
+from upsonic.ocr.layer_1.engines import TesseractEngine
+from upsonic.ocr import OCR
+
+engine = TesseractEngine(lang="eng")
+ocr = OCR(layer_1_ocr_engine=engine)
+```
+
+### Constructor
+
+<ParamField path="lang" type="str" default="eng">
+  Language code (e.g., "eng", "spa", "fra")
+</ParamField>
+
+<ParamField path="config" type="str" default="">
+  Tesseract configuration string
+</ParamField>
+
+**Installation:**
+```bash
+# Install Tesseract system package
+# macOS
+brew install tesseract
+
+# Ubuntu/Debian
+sudo apt-get install tesseract-ocr
+
+# Then install Python package
+pip install "upsonic[ocr]"
+```
+
+## PaddleOCR
+
+High-performance OCR from PaddlePaddle:
+
+```python
+from upsonic.ocr.layer_1.engines import PaddleOCREngine
+from upsonic.ocr import OCR
+
+engine = PaddleOCREngine(lang="en")
+ocr = OCR(layer_1_ocr_engine=engine)
+```
+
+### Constructor
+
+<ParamField path="lang" type="str" default="en">
+  Language code (e.g., "en", "ch", "japan", "korean")
+</ParamField>
+
+<ParamField path="use_angle_cls" type="bool" default="True">
+  Enable angle classification
+</ParamField>
+
+<ParamField path="use_gpu" type="bool" default="True">
+  Use GPU if available
+</ParamField>
+
+**Installation:**
+```bash
+pip install "upsonic[ocr]"
+```
+
+## DeepSeek OCR
+
+Vision-language model for OCR:
+
+```python
+from upsonic.ocr.layer_1.engines import DeepSeekOCREngine
+from upsonic.ocr import OCR
+import os
+
+os.environ["DEEPSEEK_API_KEY"] = "your-key"
+
+engine = DeepSeekOCREngine()
+ocr = OCR(layer_1_ocr_engine=engine)
+```
+
+**Installation:**
+```bash
+pip install upsonic
+```
+
+## Ollama OCR
+
+Local vision models via Ollama:
+
+```python
+from upsonic.ocr.layer_1.engines import OllamaOCREngine
+from upsonic.ocr import OCR
+
+engine = OllamaOCREngine(model="llava")
+ocr = OCR(layer_1_ocr_engine=engine)
+```
+
+### Constructor
+
+<ParamField path="model" type="str" default="llava">
+  Ollama vision model name
+</ParamField>
+
+<ParamField path="base_url" type="str" default="http://localhost:11434">
+  Ollama server URL
+</ParamField>
+
+**Requirements:**
+```bash
+# Install and start Ollama
+# Then pull a vision model
+ollama pull llava
+```
+
+## Engine comparison
+
+| Engine | Speed | Accuracy | GPU | Languages | Use Case |
+|--------|-------|----------|-----|-----------|----------|
+| EasyOCR | Medium | High | Yes | 80+ | General purpose |
+| RapidOCR | Fast | Medium | No | Few | Quick scans |
+| Tesseract | Fast | High | No | 100+ | English documents |
+| PaddleOCR | Fast | High | Yes | Many | Production |
+| DeepSeek | Slow | Very High | N/A | All | Complex layouts |
+| Ollama | Medium | High | Optional | All | Local/private |
+
+## Choosing an engine
+
+<Tip>
+**For English documents**: Use Tesseract or PaddleOCR for best accuracy
+</Tip>
+
+<Tip>
+**For multiple languages**: Use EasyOCR with language list
+</Tip>
+
+<Tip>
+**For complex layouts**: Use DeepSeek or Ollama with vision models
+</Tip>
+
+<Tip>
+**For production**: Use PaddleOCR with GPU acceleration
+</Tip>
+
+## Custom engine configuration
+
+### EasyOCR with custom model path
+
+```python
+engine = EasyOCREngine(
+    languages=["en", "es"],
+    gpu=True,
+    model_storage_directory="./models"
+)
+```
+
+### Tesseract with page segmentation
+
+```python
+engine = TesseractEngine(
+    lang="eng",
+    config="--psm 6"  # Assume uniform text block
+)
+```
+
+### PaddleOCR with angle detection
+
+```python
+engine = PaddleOCREngine(
+    lang="en",
+    use_angle_cls=True,
+    use_gpu=True
+)
+```
+
+## Batch processing
+
+Process multiple files with the same engine:
+
+```python
+from upsonic.ocr import OCR
+from upsonic.ocr.layer_1.engines import EasyOCREngine
+
+engine = EasyOCREngine(languages=["en"])
+ocr = OCR(layer_1_ocr_engine=engine)
+
+files = ["doc1.pdf", "doc2.pdf", "doc3.pdf"]
+
+for file in files:
+    text = ocr.get_text(file)
+    print(f"{file}: {len(text)} characters")
+```
+
+## Error handling
+
+```python
+try:
+    engine = EasyOCREngine(languages=["en"])
+    ocr = OCR(layer_1_ocr_engine=engine)
+    text = ocr.get_text("document.pdf")
+except ImportError:
+    print("OCR dependencies not installed")
+except Exception as e:
+    print(f"OCR failed: {e}")
+```
+
+## See also
+
+- [OCR Class](/api/ocr/ocr) - OCR class API reference
+- [OCR Concept](/concepts/ocr) - High-level overview
+- [Document Processing](/guides/document-processing) - Complete tutorial

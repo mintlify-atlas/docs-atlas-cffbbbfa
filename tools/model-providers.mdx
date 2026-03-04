@@ -1,0 +1,214 @@
+---
+title: Model providers
+description: Configure OpenAI, Anthropic, Azure, AWS Bedrock, Google, and other AI providers
+---
+
+## Overview
+
+Upsonic supports multiple AI model providers, allowing you to choose the best model for your use case or switch providers without changing your code.
+
+## OpenAI
+
+Use GPT-4, GPT-4o, and GPT-3.5 models:
+
+```python
+from upsonic import Agent, Task
+import os
+
+os.environ["OPENAI_API_KEY"] = "sk-..."
+
+agent = Agent(
+    model="openai/gpt-4o",
+    name="Assistant"
+)
+
+task = Task(description="Explain quantum computing")
+result = agent.do(task)
+```
+
+**Available models:**
+- `openai/gpt-4o` - Latest GPT-4 Omni
+- `openai/gpt-4-turbo` - GPT-4 Turbo
+- `openai/gpt-4` - GPT-4
+- `openai/gpt-3.5-turbo` - GPT-3.5 Turbo
+
+## Anthropic
+
+Use Claude models:
+
+```python
+import os
+
+os.environ["ANTHROPIC_API_KEY"] = "sk-ant-..."
+
+agent = Agent(
+    model="anthropic/claude-sonnet-4-5",
+    name="Assistant"
+)
+```
+
+**Available models:**
+- `anthropic/claude-sonnet-4-5` - Claude 4.5 Sonnet
+- `anthropic/claude-sonnet-3-5` - Claude 3.5 Sonnet
+- `anthropic/claude-opus-3` - Claude 3 Opus
+- `anthropic/claude-haiku-3` - Claude 3 Haiku
+
+## Azure OpenAI
+
+Use OpenAI models through Azure:
+
+```python
+import os
+
+os.environ["AZURE_OPENAI_API_KEY"] = "..."
+os.environ["AZURE_OPENAI_ENDPOINT"] = "https://your-resource.openai.azure.com/"
+os.environ["AZURE_OPENAI_API_VERSION"] = "2024-02-15-preview"
+
+agent = Agent(
+    model="azure/gpt-4o",
+    name="Assistant"
+)
+```
+
+## AWS Bedrock
+
+Use models through AWS Bedrock:
+
+```python
+import os
+
+os.environ["AWS_ACCESS_KEY_ID"] = "..."
+os.environ["AWS_SECRET_ACCESS_KEY"] = "..."
+os.environ["AWS_REGION"] = "us-east-1"
+
+agent = Agent(
+    model="bedrock/anthropic.claude-3-5-sonnet-20240620-v1:0",
+    name="Assistant"
+)
+```
+
+**Available models:**
+- `bedrock/anthropic.claude-3-5-sonnet-*` - Claude 3.5 Sonnet
+- `bedrock/anthropic.claude-3-opus-*` - Claude 3 Opus
+- `bedrock/anthropic.claude-3-haiku-*` - Claude 3 Haiku
+- `bedrock/meta.llama3-*` - Llama 3
+
+## Google Gemini
+
+Use Gemini models:
+
+```python
+import os
+
+os.environ["GOOGLE_API_KEY"] = "..."
+
+agent = Agent(
+    model="google/gemini-2.0-flash-exp",
+    name="Assistant"
+)
+```
+
+**Available models:**
+- `google/gemini-2.0-flash-exp` - Gemini 2.0 Flash
+- `google/gemini-1.5-pro` - Gemini 1.5 Pro
+- `google/gemini-1.5-flash` - Gemini 1.5 Flash
+
+## Groq
+
+Use Llama and Mixtral models with fast inference:
+
+```python
+import os
+
+os.environ["GROQ_API_KEY"] = "..."
+
+agent = Agent(
+    model="groq/llama-3.3-70b-versatile",
+    name="Assistant"
+)
+```
+
+**Available models:**
+- `groq/llama-3.3-70b-versatile` - Llama 3.3 70B
+- `groq/mixtral-8x7b-32768` - Mixtral 8x7B
+
+## Ollama (Local models)
+
+Run models locally:
+
+```bash
+# Start Ollama server
+ollama serve
+
+# Pull a model
+ollama pull llama3
+```
+
+```python
+agent = Agent(
+    model="ollama/llama3",
+    name="Assistant"
+)
+```
+
+## Switching providers
+
+Switch providers without changing code:
+
+```python
+import os
+
+# Read from environment
+model = os.getenv("MODEL_NAME", "anthropic/claude-sonnet-4-5")
+
+agent = Agent(
+    model=model,
+    name="Assistant"
+)
+```
+
+**Environment variables:**
+```bash
+# Development
+export MODEL_NAME="openai/gpt-4o"
+export OPENAI_API_KEY="sk-..."
+
+# Production
+export MODEL_NAME="anthropic/claude-sonnet-4-5"
+export ANTHROPIC_API_KEY="sk-ant-..."
+```
+
+## Model settings
+
+Configure model behavior:
+
+```python
+agent = Agent(
+    model="anthropic/claude-sonnet-4-5",
+    model_settings={
+        "temperature": 0.7,
+        "max_tokens": 4096,
+        "top_p": 0.9
+    }
+)
+```
+
+See [Model Settings](/api/models/settings) for all available options.
+
+## Cost comparison
+
+Approximate costs per 1M tokens (as of 2024):
+
+| Provider | Model | Input | Output |
+|----------|-------|--------|--------|
+| OpenAI | GPT-4o | $5.00 | $15.00 |
+| Anthropic | Claude Sonnet 4.5 | $3.00 | $15.00 |
+| Anthropic | Claude Haiku 3 | $0.25 | $1.25 |
+| Google | Gemini 1.5 Flash | $0.35 | $1.05 |
+| Groq | Llama 3.3 70B | $0.59 | $0.79 |
+
+<Note>
+Prices vary. Check provider websites for current pricing.
+</Note>
+
+See the [Model Providers API reference](/api/models/providers) for complete documentation.

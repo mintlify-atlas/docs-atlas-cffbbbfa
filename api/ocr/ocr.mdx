@@ -1,0 +1,209 @@
+---
+title: OCR class
+description: API reference for the OCR class
+---
+
+## Overview
+
+The `OCR` class provides a unified interface for extracting text from images and PDFs using multiple OCR engines.
+
+## Constructor
+
+```python
+from upsonic.ocr import OCR
+from upsonic.ocr.layer_1.engines import EasyOCREngine
+
+engine = EasyOCREngine(languages=["en"])
+ocr = OCR(layer_1_ocr_engine=engine)
+```
+
+### Parameters
+
+<ParamField path="layer_1_ocr_engine" type="OCREngineBase" required>
+  The OCR engine to use for text extraction. Must be an instance of an OCR engine class.
+</ParamField>
+
+<ParamField path="layer_0_preprocessor" type="PreprocessorBase" default="None">
+  Optional preprocessor for image enhancement before OCR.
+</ParamField>
+
+## Methods
+
+### get_text()
+
+Extract text from an image or PDF file:
+
+```python
+text = ocr.get_text("document.pdf")
+print(text)
+```
+
+**Parameters:**
+
+<ParamField path="file_path" type="str" required>
+  Path to the image or PDF file
+</ParamField>
+
+<ParamField path="page_numbers" type="List[int]" default="None">
+  Specific page numbers to process (for PDFs). If None, processes all pages.
+</ParamField>
+
+**Returns:**
+
+<ResponseField name="text" type="str">
+  Extracted text from the document
+</ResponseField>
+
+### get_text_with_boxes()
+
+Extract text with bounding box information:
+
+```python
+results = ocr.get_text_with_boxes("image.png")
+
+for detection in results:
+    print(f"Text: {detection['text']}")
+    print(f"Confidence: {detection['confidence']}")
+    print(f"Box: {detection['box']}")
+```
+
+**Parameters:**
+
+<ParamField path="file_path" type="str" required>
+  Path to the image file
+</ParamField>
+
+**Returns:**
+
+<ResponseField name="results" type="List[Dict]">
+  List of detections, each containing:
+  - `text` (str): Detected text
+  - `confidence` (float): Confidence score (0-1)
+  - `box` (List[Tuple]): Bounding box coordinates
+</ResponseField>
+
+## Usage examples
+
+### Basic text extraction
+
+```python
+from upsonic.ocr import OCR
+from upsonic.ocr.layer_1.engines import EasyOCREngine
+
+# Initialize OCR
+engine = EasyOCREngine(languages=["en"])
+ocr = OCR(layer_1_ocr_engine=engine)
+
+# Extract text from image
+text = ocr.get_text("invoice.png")
+print(text)
+```
+
+### Multi-page PDF
+
+```python
+# Extract from specific pages
+text = ocr.get_text("report.pdf", page_numbers=[1, 2, 3])
+
+# Extract from all pages
+text = ocr.get_text("report.pdf")
+```
+
+### Multiple languages
+
+```python
+from upsonic.ocr.layer_1.engines import EasyOCREngine
+
+engine = EasyOCREngine(languages=["en", "es", "fr"])
+ocr = OCR(layer_1_ocr_engine=engine)
+
+text = ocr.get_text("multilingual.pdf")
+```
+
+### With preprocessing
+
+```python
+from upsonic.ocr.layer_0 import ImagePreprocessor
+
+preprocessor = ImagePreprocessor(
+    deskew=True,
+    denoise=True,
+    enhance_contrast=True
+)
+
+ocr = OCR(
+    layer_1_ocr_engine=engine,
+    layer_0_preprocessor=preprocessor
+)
+
+text = ocr.get_text("low_quality.jpg")
+```
+
+### Agent integration
+
+```python
+from upsonic import Agent, Task
+from upsonic.ocr import OCR
+from upsonic.ocr.layer_1.engines import EasyOCREngine
+
+# Create OCR instance
+engine = EasyOCREngine(languages=["en"])
+ocr = OCR(layer_1_ocr_engine=engine)
+
+# Extract text
+text = ocr.get_text("receipt.jpg")
+
+# Use with agent
+task = Task(
+    description=f"""
+    Analyze this receipt and extract:
+    - Store name
+    - Date
+    - Total amount
+    - List of items
+    
+    Receipt text:
+    {text}
+    """
+)
+
+agent = Agent(model="anthropic/claude-sonnet-4-5")
+result = agent.do(task)
+print(result)
+```
+
+## Supported file formats
+
+- **Images**: PNG, JPEG, TIFF, BMP, GIF
+- **Documents**: PDF
+
+## Best practices
+
+<Tip>
+**Choose the right engine** - Different engines excel at different tasks. EasyOCR is great for general use, Tesseract for English text, and PaddleOCR for Asian languages.
+</Tip>
+
+<Note>
+**Image quality** - Higher resolution images produce better results. Aim for at least 300 DPI for scanned documents.
+</Note>
+
+<Warning>
+**Memory usage** - Processing large PDFs can consume significant memory. Consider processing in batches for large documents.
+</Warning>
+
+## Error handling
+
+```python
+try:
+    text = ocr.get_text("document.pdf")
+except FileNotFoundError:
+    print("File not found")
+except Exception as e:
+    print(f"OCR failed: {e}")
+```
+
+## See also
+
+- [OCR Engines](/api/ocr/engines) - Available OCR engine implementations
+- [OCR Concept](/concepts/ocr) - High-level overview and use cases
+- [Document Processing Guide](/guides/document-processing) - Complete tutorial

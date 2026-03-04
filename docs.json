@@ -1,122 +1,133 @@
 {
   "$schema": "https://mintlify.com/docs.json",
-  "theme": "mint",
-  "name": "Mint Starter Kit",
+  "name": "Upsonic",
+  "theme": "aspen",
   "colors": {
-    "primary": "#16A34A",
-    "light": "#07C983",
-    "dark": "#15803D"
+    "primary": "#04d47d",
+    "light": "#142c33",
+    "dark": "#04d47d"
   },
-  "favicon": "/favicon.svg",
+
+  "navbar": {
+    "primary": {
+      "type": "github",
+      "href": "https://github.com/Upsonic/Upsonic"
+    }
+  },
+  "footer": {
+    "socials": {
+      "github": "https://github.com/Upsonic/Upsonic"
+    }
+  },
   "navigation": {
     "tabs": [
       {
-        "tab": "Guides",
+        "tab": "Documentation",
         "groups": [
           {
-            "group": "Getting started",
+            "group": "Get Started",
             "pages": [
-              "index",
-              "quickstart",
-              "development"
+              "introduction",
+              "installation",
+              "quickstart"
             ]
           },
           {
-            "group": "Customization",
+            "group": "Core Concepts",
             "pages": [
-              "essentials/settings",
-              "essentials/navigation"
+              "concepts/agent",
+              "concepts/autonomous-agent",
+              "concepts/task",
+              "concepts/tools",
+              "concepts/memory",
+              "concepts/safety-engine",
+              "concepts/team",
+              "concepts/knowledge-base",
+              "concepts/ocr"
             ]
           },
           {
-            "group": "Writing content",
+            "group": "Guides",
             "pages": [
-              "essentials/markdown",
-              "essentials/code",
-              "essentials/images",
-              "essentials/reusable-snippets"
+              "guides/building-agents",
+              "guides/multi-agent-workflows",
+              "guides/custom-tools",
+              "guides/safety-policies",
+              "guides/memory-management",
+              "guides/rag-knowledge-base",
+              "guides/document-processing"
             ]
           },
           {
-            "group": "AI tools",
+            "group": "Tools & Integration",
             "pages": [
-              "ai-tools/cursor",
-              "ai-tools/claude-code",
-              "ai-tools/windsurf"
+              "tools/mcp-tools",
+              "tools/built-in-tools",
+              "tools/custom-tools",
+              "tools/storage-backends",
+              "tools/model-providers"
+            ]
+          },
+          {
+            "group": "Deployment",
+            "pages": [
+              "deployment/cli",
+              "deployment/interfaces",
+              "deployment/agentos"
             ]
           }
         ]
       },
       {
-        "tab": "API reference",
+        "tab": "API Reference",
         "groups": [
           {
-            "group": "API documentation",
+            "group": "Core Classes",
             "pages": [
-              "api-reference/introduction"
+              "api/agent",
+              "api/autonomous-agent",
+              "api/task",
+              "api/team",
+              "api/knowledge-base"
             ]
           },
           {
-            "group": "Endpoint examples",
+            "group": "Safety Engine",
             "pages": [
-              "api-reference/endpoint/get",
-              "api-reference/endpoint/create",
-              "api-reference/endpoint/delete",
-              "api-reference/endpoint/webhook"
+              "api/safety-engine/policies",
+              "api/safety-engine/custom-policies"
+            ]
+          },
+          {
+            "group": "Storage",
+            "pages": [
+              "api/storage/memory",
+              "api/storage/backends"
+            ]
+          },
+          {
+            "group": "Tools",
+            "pages": [
+              "api/tools/base",
+              "api/tools/common-tools"
+            ]
+          },
+          {
+            "group": "OCR",
+            "pages": [
+              "api/ocr/ocr",
+              "api/ocr/engines"
+            ]
+          },
+          {
+            "group": "Models",
+            "pages": [
+              "api/models/providers",
+              "api/models/settings"
             ]
           }
         ]
       }
-    ],
-    "global": {
-      "anchors": [
-        {
-          "anchor": "Documentation",
-          "href": "https://mintlify.com/docs",
-          "icon": "book-open-cover"
-        },
-        {
-          "anchor": "Blog",
-          "href": "https://mintlify.com/blog",
-          "icon": "newspaper"
-        }
-      ]
-    }
-  },
-  "logo": {
-    "light": "/logo/light.svg",
-    "dark": "/logo/dark.svg"
-  },
-  "navbar": {
-    "links": [
-      {
-        "label": "Support",
-        "href": "mailto:hi@mintlify.com"
-      }
-    ],
-    "primary": {
-      "type": "button",
-      "label": "Dashboard",
-      "href": "https://dashboard.mintlify.com"
-    }
-  },
-  "contextual": {
-    "options": [
-     "copy",
-     "view",
-     "chatgpt",
-     "claude",
-     "perplexity",
-     "mcp",
-     "cursor",
-     "vscode"
-   ]
-  },
-  "footer": {
-    "socials": {
-      "x": "https://x.com/mintlify",
-      "github": "https://github.com/mintlify",
-      "linkedin": "https://linkedin.com/company/mintlify"
-    }
+    ]
   }
 }

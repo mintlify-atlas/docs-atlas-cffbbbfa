@@ -1,0 +1,136 @@
+---
+title: Built-in tools
+description: Common tools included with Upsonic for search, finance, and data analysis
+---
+
+## Overview
+
+Upsonic includes several built-in tools that you can use immediately without additional configuration.
+
+## Financial tools
+
+### YFinanceTools
+
+Access stock market data, company information, and financial metrics:
+
+```python
+from upsonic import Agent, Task
+from upsonic.tools.common_tools import YFinanceTools
+
+agent = Agent(
+    model="anthropic/claude-sonnet-4-5",
+    name="Financial Analyst"
+)
+
+task = Task(
+    description="Analyze Tesla stock performance and provide investment insights",
+    tools=[YFinanceTools()]
+)
+
+agent.print_do(task)
+```
+
+**Available methods:**
+- `get_current_stock_price(ticker)` - Current stock price
+- `get_company_info(ticker)` - Company details
+- `get_analyst_recommendations(ticker)` - Buy/sell ratings
+- `get_company_news(ticker)` - Recent news articles
+- `get_stock_fundamentals(ticker)` - Financial metrics
+- `get_income_statements(ticker)` - Income statement data
+- `get_historical_stock_prices(ticker, period)` - Price history
+- `get_technical_indicators(ticker, period)` - Technical analysis
+
+## Search tools
+
+### Tavily search
+
+AI-optimized search with high-quality results:
+
+```python
+from upsonic import Agent, Task
+from upsonic.tools.common_tools import tavily_search_tool
+import os
+
+# Set API key
+os.environ["TAVILY_API_KEY"] = "your-key"
+
+task = Task(
+    description="Research the latest developments in quantum computing",
+    tools=[tavily_search_tool()]
+)
+
+agent.print_do(task)
+```
+
+### DuckDuckGo search
+
+Privacy-focused search without API keys:
+
+```python
+from upsonic.tools.common_tools import duckduckgo_search_tool
+
+task = Task(
+    description="Find recent articles about renewable energy",
+    tools=[duckduckgo_search_tool()]
+)
+```
+
+### Bocha search
+
+Customizable search with time and domain filtering:
+
+```python
+from upsonic.tools.common_tools import bocha_search_tool
+
+# Search with filters
+task = Task(
+    description="Search for Python tutorials from the past month",
+    tools=[bocha_search_tool()]
+)
+```
+
+## Using multiple tools
+
+Combine tools for complex tasks:
+
+```python
+from upsonic import Agent, Task
+from upsonic.tools.common_tools import (
+    YFinanceTools,
+    tavily_search_tool
+)
+
+task = Task(
+    description="""
+    Analyze Apple stock and research recent news about the company.
+    Provide a comprehensive investment recommendation.
+    """,
+    tools=[
+        YFinanceTools(),
+        tavily_search_tool()
+    ]
+)
+
+agent = Agent(model="anthropic/claude-sonnet-4-5")
+result = agent.do(task)
+```
+
+## Tool configuration
+
+Customize tool behavior:
+
+```python
+from upsonic.tools import ToolConfig
+from upsonic.tools.common_tools import YFinanceTools
+
+# Configure tool with custom settings
+finance_tools = YFinanceTools(
+    config=ToolConfig(
+        cache_enabled=True,
+        timeout=30,
+        retry_count=3
+    )
+)
+```
+
+See the [Common Tools API reference](/api/tools/common-tools) for complete documentation.

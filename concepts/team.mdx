@@ -1,0 +1,530 @@
+---
+title: "Team"
+description: "Multi-agent coordination with sequential, coordinate, and route execution modes"
+---
+
+## Overview
+
+The `Team` class enables multi-agent coordination and collaboration. It allows you to orchestrate multiple agents (or even nested teams) to work together on complex tasks using different execution patterns: sequential, coordinate (leader-based), and route (router-based).
+
+## Key Features
+
+- **Multiple Execution Modes**: Sequential, coordinate (leader), route (router)
+- **Hierarchical Teams**: Teams can contain other teams as entities
+- **Task Distribution**: Intelligent task assignment to specialized agents
+- **Context Sharing**: Automatic context propagation between agents
+- **Result Combination**: Smart result aggregation from multiple agents
+- **Shared Memory**: Optional memory sharing across team members
+- **Agent-as-Tool**: Team members can delegate to each other
+- **Streaming Support**: Stream output from team execution
+
+## Basic Usage
+
+### Simple Sequential Team
+
+```python
+from upsonic import Agent, Team, Task
+
+# Create specialized agents
+researcher = Agent(
+    model="openai/gpt-4o",
+    name="Researcher",
+    role="Research specialist",
+    goal="Find and analyze information"
+)
+
+writer = Agent(
+    model="anthropic/claude-3-sonnet",
+    name="Writer",
+    role="Content writer",
+    goal="Create clear, engaging content"
+)
+
+# Create team
+team = Team(
+    entities=[researcher, writer],
+    mode="sequential"
+)
+
+# Execute task - runs through each agent in sequence
+result = team.do(Task(
+    "Research AI trends and write a blog post"
+))
+```
+
+## Initialization
+
+### Constructor Parameters
+
+```python
+Team(
+    entities: List[Union[Agent, Team]],
+    tasks: Optional[List[Task]] = None,
+    
+    # Identity
+    name: Optional[str] = None,
+    role: Optional[str] = None,
+    goal: Optional[str] = None,
+    
+    # Execution mode
+    mode: Literal["sequential", "coordinate", "route"] = "sequential",
+    
+    # Mode-specific
+    leader: Optional[Agent] = None,  # For coordinate mode
+    router: Optional[Agent] = None,  # For route mode
+    
+    # Collaboration
+    ask_other_team_members: bool = False,
+    
+    # Configuration
+    model: Optional[Any] = None,
+    response_format: Any = str,
+    memory: Optional[Memory] = None,
+    
+    # Debug
+    debug: bool = False,
+    debug_level: int = 1,
+)
+```
+
+### Key Parameters
+
+<ParamField path="entities" type="List[Union[Agent, Team]]" required>
+  List of agents or teams that are part of this team
+</ParamField>
+
+<ParamField path="mode" type="str" default="sequential">
+  Execution mode: "sequential", "coordinate", or "route"
+</ParamField>
+
+<ParamField path="leader" type="Agent">
+  Leader agent for coordinate mode (auto-created if None)
+</ParamField>
+
+<ParamField path="router" type="Agent">
+  Router agent for route mode (auto-created if None)
+</ParamField>
+
+<ParamField path="ask_other_team_members" type="bool" default="false">
+  Automatically add other team members as tools for delegation
+</ParamField>
+
+<ParamField path="memory" type="Memory">
+  Shared memory instance for all team members
+</ParamField>
+
+## Execution Modes
+
+### Sequential Mode
+
+Tasks flow through agents in sequence:
+
+```python
+team = Team(
+    entities=[researcher, analyzer, writer],
+    mode="sequential"
+)
+
+# Task 1 → researcher → analyzer → writer → result
+# Each agent builds on previous agent's work
+```
+
+#### How It Works
+
+1. Task is assigned to the most suitable agent
+2. Agent completes task and produces result
+3. Next task (or sub-task) is assigned based on context
+4. Process continues until all tasks complete
+5. Results are combined into final output
+
+### Coordinate Mode
+
+Leader agent coordinates and delegates:
+
+```python
+leader = Agent(
+    model="openai/gpt-4o",
+    name="Coordinator",
+    role="Team leader"
+)
+
+team = Team(
+    entities=[researcher, writer, editor],
+    mode="coordinate",
+    leader=leader
+)
+
+# Leader analyzes task, delegates to appropriate agents
+# Leader synthesizes results
+```
+
+#### How It Works
+
+1. Leader receives the task
+2. Leader breaks down task and delegates to team members
+3. Team members execute their portions
+4. Leader synthesizes results into final output
+
+### Route Mode
+
+Router selects the best agent for each task:
+
+```python
+router = Agent(
+    model="openai/gpt-4o",
+    name="Router",
+    role="Task router"
+)
+
+team = Team(
+    entities=[technical_expert, business_expert, legal_expert],
+    mode="route",
+    router=router
+)
+
+# Router analyzes task and routes to best-suited expert
+```
+
+#### How It Works
+
+1. Router receives the task
+2. Router selects the most appropriate agent
+3. Selected agent executes the task
+4. Result is returned
+
+## Hierarchical Teams
+
+### Nested Teams
+
+Teams can contain other teams:
+
+```python
+# Research team
+research_team = Team(
+    entities=[data_analyst, market_researcher],
+    name="ResearchTeam",
+    mode="sequential"
+)
+
+# Content team
+content_team = Team(
+    entities=[writer, editor, designer],
+    name="ContentTeam",
+    mode="sequential"
+)
+
+# Top-level team
+main_team = Team(
+    entities=[research_team, content_team],
+    name="MainTeam",
+    mode="coordinate"
+)
+
+# Hierarchical execution
+result = main_team.do(Task(
+    "Research the market and create a marketing campaign"
+))
+```
+
+## Agent Collaboration
+
+### Ask Other Team Members
+
+Enable agents to delegate to each other:
+
+```python
+team = Team(
+    entities=[researcher, writer, reviewer],
+    ask_other_team_members=True  # Add agents as tools
+)
+
+# Each agent can now call the others as tools
+# Researcher can ask Writer to draft content
+# Writer can ask Reviewer for feedback
+```
+
+## Shared Memory
+
+### Team Memory
+
+Share conversation history across all team members:
+
+```python
+from upsonic.storage import InMemoryStorage, Memory
+
+storage = InMemoryStorage()
+memory = Memory(
+    storage=storage,
+    full_session_memory=True
+)
+
+team = Team(
+    entities=[agent1, agent2, agent3],
+    memory=memory  # Shared across all agents
+)
+
+# All agents access the same conversation history
+```
+
+### Memory Propagation
+
+Memory is automatically propagated to nested teams:
+
+```python
+memory = Memory(storage=storage, full_session_memory=True)
+
+# Memory is propagated to all nested entities
+main_team = Team(
+    entities=[
+        Team(entities=[agent1, agent2]),  # Gets memory
+        Team(entities=[agent3, agent4]),  # Gets memory
+        agent5  # Gets memory
+    ],
+    memory=memory
+)
+```
+
+## Task Distribution
+
+### Multiple Tasks
+
+```python
+tasks = [
+    Task("Research the topic"),
+    Task("Analyze the data"),
+    Task("Write the report")
+]
+
+team = Team(
+    entities=[researcher, analyst, writer],
+    tasks=tasks
+)
+
+result = team.do()  # Executes all tasks
+```
+
+### Dynamic Task Assignment
+
+```python
+team = Team(
+    entities=[specialist1, specialist2, specialist3],
+    mode="sequential"
+)
+
+# Tasks are dynamically assigned based on:
+# - Agent roles and goals
+# - Task requirements
+# - Previous results
+# - Context
+
+result = team.do(Task("Complex multi-step task"))
+```
+
+## Streaming Output
+
+### Stream Team Execution
+
+```python
+team = Team(
+    entities=[agent1, agent2, agent3],
+    mode="sequential"
+)
+
+# Stream output from team
+for chunk in team.stream(Task("Process this data")):
+    print(chunk, end="", flush=True)
+```
+
+### Async Streaming
+
+```python
+async for chunk in team.astream(Task("Process this data")):
+    print(chunk, end="", flush=True)
+```
+
+## Execution Methods
+
+### Synchronous Execution
+
+```python
+# Execute tasks
+result = team.do(tasks)
+
+# Execute with printing
+team.print_do(tasks)
+
+# Alias methods
+team.complete(tasks)
+team.print_complete(tasks)
+```
+
+### Asynchronous Execution
+
+```python
+# Async execution
+result = await team.do_async(task)
+
+# Alias
+result = await team.ado(task)
+
+# Async streaming
+async for chunk in team.astream(task):
+    print(chunk)
+```
+
+## Advanced Features
+
+### Custom Result Combination
+
+Results from multiple agents are automatically combined:
+
+```python
+team = Team(
+    entities=[agent1, agent2, agent3],
+    model="openai/gpt-4o",  # Model for result combination
+    mode="sequential"
+)
+
+# Results are intelligently synthesized
+```
+
+### Response Format
+
+```python
+from pydantic import BaseModel
+
+class Report(BaseModel):
+    summary: str
+    findings: List[str]
+    recommendations: List[str]
+
+team = Team(
+    entities=[researcher, analyst],
+    response_format=Report
+)
+
+result = team.do(Task("Analyze market trends"))
+print(result.summary)
+print(result.recommendations)
+```
+
+## Complete Examples
+
+### Research and Writing Team
+
+```python
+from upsonic import Agent, Team, Task
+from upsonic.storage import InMemoryStorage, Memory
+
+# Create memory
+storage = InMemoryStorage()
+memory = Memory(storage=storage, full_session_memory=True)
+
+# Create specialized agents
+researcher = Agent(
+    model="openai/gpt-4o",
+    name="Researcher",
+    role="Research specialist",
+    goal="Find accurate, relevant information",
+    instructions="Focus on finding credible sources and data"
+)
+
+analyst = Agent(
+    model="openai/gpt-4o",
+    name="Analyst",
+    role="Data analyst",
+    goal="Analyze and synthesize information",
+    instructions="Look for patterns and insights"
+)
+
+writer = Agent(
+    model="anthropic/claude-3-sonnet",
+    name="Writer",
+    role="Content writer",
+    goal="Create engaging, clear content",
+    instructions="Write for a general audience"
+)
+
+editor = Agent(
+    model="openai/gpt-4o",
+    name="Editor",
+    role="Editor",
+    goal="Ensure quality and coherence",
+    instructions="Check for clarity, accuracy, and flow"
+)
+
+# Create team
+team = Team(
+    entities=[researcher, analyst, writer, editor],
+    name="ContentCreationTeam",
+    mode="sequential",
+    memory=memory,
+    debug=True
+)
+
+# Execute complex task
+result = team.do(Task(
+    "Research the latest developments in quantum computing, "
+    "analyze the implications for the tech industry, "
+    "and write a comprehensive article"
+))
+
+print(result)
+```
+
+### Hierarchical Organization
+
+```python
+# Specialist teams
+research_team = Team(
+    entities=[
+        Agent(model="openai/gpt-4o", name="TechResearcher"),
+        Agent(model="openai/gpt-4o", name="MarketResearcher"),
+    ],
+    name="ResearchDivision",
+    mode="coordinate"
+)
+
+engineering_team = Team(
+    entities=[
+        Agent(model="openai/gpt-4o", name="BackendDev"),
+        Agent(model="openai/gpt-4o", name="FrontendDev"),
+        Agent(model="openai/gpt-4o", name="QAEngineer"),
+    ],
+    name="EngineeringDivision",
+    mode="coordinate"
+)
+
+marketing_team = Team(
+    entities=[
+        Agent(model="openai/gpt-4o", name="ContentMarketer"),
+        Agent(model="openai/gpt-4o", name="SEOSpecialist"),
+    ],
+    name="MarketingDivision",
+    mode="sequential"
+)
+
+# Executive team
+executive_team = Team(
+    entities=[research_team, engineering_team, marketing_team],
+    name="ExecutiveTeam",
+    mode="coordinate",
+    leader=Agent(
+        model="openai/gpt-4o",
+        name="CEO",
+        role="Chief Executive Officer"
+    )
+)
+
+# Execute organization-wide task
+result = executive_team.do(Task(
+    "Plan and execute a new product launch"
+))
+```
+
+## See Also
+
+- [Agent](/concepts/agent) - Individual agents
+- [Task](/concepts/task) - Task definition
+- [Memory](/concepts/memory) - Shared memory
+- [Multi-Agent Guide](/guides/multi-agent) - Detailed patterns and examples

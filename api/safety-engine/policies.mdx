@@ -1,0 +1,624 @@
+---
+title: Built-in Policies
+description: Comprehensive reference for all built-in safety policies and their configurations
+---
+
+The Safety Engine provides a comprehensive set of pre-built policies for content filtering and protection. Each policy combines a rule (detection logic) and an action (what to do when detected).
+
+## Policy Types
+
+Policies are named using this pattern: `[Category][Action]Policy[_Variant]`
+
+**Actions:**
+- `Block` - Blocks content with a user-friendly message
+- `Anonymize` - Replaces sensitive data with random values (reversible)
+- `Replace` - Replaces sensitive data with placeholders like `[REDACTED]`
+- `RaiseException` - Raises `DisallowedOperation` exception
+
+**Variants:**
+- `_LLM` - Uses LLM for enhanced action messages
+- `_LLM_Finder` - Uses LLM for both detection and action
+
+## PII (Personal Identifiable Information) Policies
+
+Protects personal data like names, emails, addresses, phone numbers, and government IDs.
+
+### Detected Patterns
+
+- **Email addresses**: `john@example.com`
+- **Phone numbers**: US and international formats
+- **Social Security Numbers**: `123-45-6789`
+- **Credit card numbers**: All major card formats
+- **Addresses**: Street addresses and postal codes
+- **Dates of birth**: Multiple date formats
+- **Driver's licenses**: Various state formats
+- **Passport numbers**: International formats
+- **IP addresses**: IPv4 and IPv6
+- **MAC addresses**: Network hardware addresses
+
+### Available Policies
+
+<CodeGroup>
+
+```python Block Content
+from upsonic.safety_engine import PIIBlockPolicy
+
+agent = Direct(
+    model="openai/gpt-4o",
+    safety_policies=[PIIBlockPolicy]
+)
+
+# Blocks content containing PII
+result = agent.run("My email is john@example.com and SSN is 123-45-6789")
+# Raises block error with user-friendly message
+```
+
+```python Anonymize PII
+from upsonic.safety_engine import PIIAnonymizePolicy
+
+agent = Direct(
+    model="openai/gpt-4o",
+    safety_policies=[PIIAnonymizePolicy]
+)
+
+# Anonymizes PII before sending to LLM
+result = agent.run("Send email to john@example.com")
+# LLM sees: "Send email to xkqp@fhsmwtr.lzn"
+# Response is de-anonymized: "Email sent to john@example.com"
+```
+
+```python Replace with Placeholder
+from upsonic.safety_engine import PIIReplacePolicy
+
+agent = Direct(
+    model="openai/gpt-4o",
+    safety_policies=[PIIReplacePolicy]
+)
+
+# Replaces PII with [PII_REDACTED]
+result = agent.run("My email is john@example.com")
+# LLM sees: "My email is [PII_REDACTED]"
+```
+
+```python Raise Exception
+from upsonic.safety_engine import PIIRaiseExceptionPolicy
+
+try:
+    agent = Direct(
+        model="openai/gpt-4o",
+        safety_policies=[PIIRaiseExceptionPolicy]
+    )
+    result = agent.run("My SSN is 123-45-6789")
+except DisallowedOperation as e:
+    print(f"Policy violation: {e}")
+```
+
+```python LLM-Enhanced Detection
+from upsonic.safety_engine import PIIBlockPolicy_LLM_Finder
+
+# Uses LLM for better context-aware PII detection
+agent = Direct(
+    model="openai/gpt-4o",
+    safety_policies=[PIIBlockPolicy_LLM_Finder]
+)
+```
+
+</CodeGroup>
+
+### PII Policy Reference
+
+| Policy | Description | Use Case |
+|--------|-------------|----------|
+| `PIIBlockPolicy` | Blocks content with PII | Prevent PII from being processed |
+| `PIIBlockPolicy_LLM` | Block with LLM message | Enhanced user feedback |
+| `PIIBlockPolicy_LLM_Finder` | LLM detection + block | Maximum accuracy |
+| `PIIAnonymizePolicy` | Reversible anonymization | Process while protecting PII |
+| `PIIReplacePolicy` | Replace with placeholder | Simple redaction |
+| `PIIRaiseExceptionPolicy` | Raise exception | Strict enforcement |
+| `PIIRaiseExceptionPolicy_LLM` | Exception with LLM message | Detailed error context |
+
+## Financial Information Policies
+
+Protects financial data like credit cards, bank accounts, and transaction details.
+
+### Detected Patterns
+
+- **Credit/debit card numbers**: All major card formats
+- **Bank account numbers**: Various formats
+- **Routing numbers**: US bank routing numbers
+- **IBAN/SWIFT codes**: International banking
+- **CVV/CVC codes**: Card security codes
+- **Financial keywords**: account balance, wire transfer, payment details
+
+### Available Policies
+
+<CodeGroup>
+
+```python Block Financial Data
+from upsonic.safety_engine import FinancialInfoBlockPolicy
+
+agent = Direct(
+    model="openai/gpt-4o",
+    safety_policies=[FinancialInfoBlockPolicy]
+)
+
+result = agent.run("My card number is 4532-1234-5678-9010")
+# Blocked with financial data protection message
+```
+
+```python Anonymize Financial Data
+from upsonic.safety_engine import FinancialInfoAnonymizePolicy
+
+agent = Direct(
+    model="openai/gpt-4o",
+    safety_policies=[FinancialInfoAnonymizePolicy]
+)
+
+# Card numbers are anonymized before LLM sees them
+result = agent.run("Process payment for card 4532-1234-5678-9010")
+```
+
+</CodeGroup>
+
+### Financial Policy Reference
+
+| Policy | Description |
+|--------|-------------|
+| `FinancialInfoBlockPolicy` | Block content with financial data |
+| `FinancialInfoBlockPolicy_LLM` | Block with LLM message |
+| `FinancialInfoBlockPolicy_LLM_Finder` | LLM detection + block |
+| `FinancialInfoAnonymizePolicy` | Reversible anonymization |
+| `FinancialInfoReplacePolicy` | Replace with placeholder |
+| `FinancialInfoRaiseExceptionPolicy` | Raise exception |
+| `FinancialInfoRaiseExceptionPolicy_LLM` | Exception with LLM message |
+
+## Medical Information Policies
+
+Protects medical records, health conditions, and patient information.
+
+### Detected Patterns
+
+- **Medical record numbers**: Patient ID formats
+- **Health insurance numbers**: Policy and member IDs
+- **Medical conditions**: Disease and diagnosis mentions
+- **Medication names**: Prescription drugs
+- **Medical procedures**: Treatment and procedure names
+- **Medical keywords**: diagnosis, treatment, prescription, patient
+
+### Available Policies
+
+<CodeGroup>
+
+```python Block Medical Data
+from upsonic.safety_engine import MedicalInfoBlockPolicy
+
+agent = Direct(
+    model="openai/gpt-4o",
+    safety_policies=[MedicalInfoBlockPolicy]
+)
+```
+
+```python Anonymize Medical Data
+from upsonic.safety_engine import MedicalInfoAnonymizePolicy
+
+agent = Direct(
+    model="openai/gpt-4o",
+    safety_policies=[MedicalInfoAnonymizePolicy]
+)
+```
+
+</CodeGroup>
+
+### Medical Policy Reference
+
+| Policy | Description |
+|--------|-------------|
+| `MedicalInfoBlockPolicy` | Block medical information |
+| `MedicalInfoBlockPolicy_LLM` | Block with LLM message |
+| `MedicalInfoBlockPolicy_LLM_Finder` | LLM detection + block |
+| `MedicalInfoAnonymizePolicy` | Reversible anonymization |
+| `MedicalInfoReplacePolicy` | Replace with placeholder |
+| `MedicalInfoRaiseExceptionPolicy` | Raise exception |
+| `MedicalInfoRaiseExceptionPolicy_LLM` | Exception with LLM message |
+
+## Profanity Detection Policies
+
+Detects toxic content, profanity, and inappropriate language using ML models.
+
+### Detection Models
+
+Powered by [Detoxify](https://github.com/unitaryai/detoxify) library with multiple models:
+
+- **`original`**: BERT-based model from Toxic Comment Classification
+- **`unbiased`**: RoBERTa-based, minimizes unintended bias (default)
+- **`multilingual`**: XLM-RoBERTa for multiple languages
+- **`original-small`**: Lightweight Albert-based version
+- **`unbiased-small`**: Lightweight unbiased version
+
+### Toxicity Categories
+
+- `toxicity` - Overall toxic score
+- `severe_toxicity` - Extremely toxic content
+- `obscene` - Obscene language
+- `threat` - Threatening language
+- `insult` - Insulting content
+- `identity_attack` - Attacks on identity groups
+- `sexual_explicit` - Sexually explicit content
+
+### Available Policies
+
+<CodeGroup>
+
+```python Default Unbiased Model
+from upsonic.safety_engine import ProfanityBlockPolicy
+
+# Uses 'unbiased' model by default
+agent = Direct(
+    model="openai/gpt-4o",
+    safety_policies=[ProfanityBlockPolicy]
+)
+```
+
+```python Multilingual Detection
+from upsonic.safety_engine import ProfanityBlockPolicy_Multilingual
+
+# Supports multiple languages
+agent = Direct(
+    model="openai/gpt-4o",
+    safety_policies=[ProfanityBlockPolicy_Multilingual]
+)
+```
+
+```python GPU Acceleration
+from upsonic.safety_engine import ProfanityBlockPolicy_GPU
+
+# Uses GPU for faster processing
+agent = Direct(
+    model="openai/gpt-4o",
+    safety_policies=[ProfanityBlockPolicy_GPU]
+)
+```
+
+```python Custom Threshold
+from upsonic.safety_engine import (
+    ProfanityBlockPolicy_LowThreshold,   # More sensitive
+    ProfanityBlockPolicy_HighThreshold   # Less sensitive
+)
+
+# Low threshold: blocks at 0.3+ score
+# High threshold: blocks at 0.7+ score
+agent = Direct(
+    model="openai/gpt-4o",
+    safety_policies=[ProfanityBlockPolicy_LowThreshold]
+)
+```
+
+</CodeGroup>
+
+### Profanity Policy Reference
+
+**Block Policies:**
+- `ProfanityBlockPolicy` - Default (unbiased model)
+- `ProfanityBlockPolicy_Original` - Original BERT model
+- `ProfanityBlockPolicy_Multilingual` - Multilingual support
+- `ProfanityBlockPolicy_OriginalSmall` - Lightweight original
+- `ProfanityBlockPolicy_UnbiasedSmall` - Lightweight unbiased
+- `ProfanityBlockPolicy_LowThreshold` - More sensitive (0.3 threshold)
+- `ProfanityBlockPolicy_HighThreshold` - Less sensitive (0.7 threshold)
+- `ProfanityBlockPolicy_CPU` - Force CPU processing
+- `ProfanityBlockPolicy_GPU` - Force GPU processing
+
+**LLM-Enhanced Block Policies:**
+- `ProfanityBlockPolicy_LLM` - LLM-enhanced messages
+- `ProfanityBlockPolicy_LLM_Original` - Original + LLM
+- `ProfanityBlockPolicy_LLM_Multilingual` - Multilingual + LLM
+- (Plus all other variants with `_LLM` suffix)
+
+**Exception Policies:**
+- `ProfanityRaiseExceptionPolicy` - All variants with exception action
+- `ProfanityRaiseExceptionPolicy_LLM` - LLM-enhanced exceptions
+
+## Cryptocurrency Policies
+
+Detects and controls cryptocurrency-related content.
+
+### Detected Patterns
+
+- **Cryptocurrency names**: Bitcoin, Ethereum, Dogecoin, etc.
+- **Crypto symbols**: BTC, ETH, XRP, etc.
+- **Blockchain terms**: mining, wallet, smart contract, DeFi
+- **Trading terms**: crypto exchange, pump, dump, HODL
+
+### Available Policies
+
+<CodeGroup>
+
+```python Block Crypto Content
+from upsonic.safety_engine import CryptoBlockPolicy
+
+agent = Direct(
+    model="openai/gpt-4o",
+    safety_policies=[CryptoBlockPolicy]
+)
+
+result = agent.run("Tell me about Bitcoin mining")
+# Blocked with crypto content message
+```
+
+```python Replace Crypto Terms
+from upsonic.safety_engine import CryptoReplace
+
+agent = Direct(
+    model="openai/gpt-4o",
+    safety_policies=[CryptoReplace]
+)
+
+# Replaces crypto terms with [CRYPTO_CONTENT]
+```
+
+</CodeGroup>
+
+### Crypto Policy Reference
+
+| Policy | Description |
+|--------|-------------|
+| `CryptoBlockPolicy` | Block crypto content |
+| `CryptoBlockPolicy_LLM_Block` | Block with LLM message |
+| `CryptoBlockPolicy_LLM_Finder` | LLM detection + block |
+| `CryptoReplace` | Replace with placeholder |
+| `CryptoRaiseExceptionPolicy` | Raise exception |
+| `CryptoRaiseExceptionPolicy_LLM_Raise` | Exception with LLM |
+
+## Adult Content Policies
+
+Detects and blocks adult/NSFW content.
+
+### Available Policies
+
+| Policy | Description |
+|--------|-------------|
+| `AdultContentBlockPolicy` | Block adult content |
+| `AdultContentBlockPolicy_LLM` | Block with LLM message |
+| `AdultContentBlockPolicy_LLM_Finder` | LLM detection + block |
+| `AdultContentRaiseExceptionPolicy` | Raise exception |
+| `AdultContentRaiseExceptionPolicy_LLM` | Exception with LLM |
+
+## Social Media & Content Policies
+
+### Sensitive Social Content
+
+Detects sensitive social media content and political discussions.
+
+| Policy | Description |
+|--------|-------------|
+| `SensitiveSocialBlockPolicy` | Block sensitive social content |
+| `SensitiveSocialBlockPolicy_LLM` | Block with LLM message |
+| `SensitiveSocialBlockPolicy_LLM_Finder` | LLM detection + block |
+| `SensitiveSocialRaiseExceptionPolicy` | Raise exception |
+| `SensitiveSocialRaiseExceptionPolicy_LLM` | Exception with LLM |
+
+### Phone Number Protection
+
+| Policy | Description |
+|--------|-------------|
+| `AnonymizePhoneNumbersPolicy` | Anonymize phone numbers |
+| `AnonymizePhoneNumbersPolicy_LLM_Finder` | LLM detection + anonymize |
+
+## Security & Threat Policies
+
+### Technical Security
+
+Protects API keys, passwords, secrets, and credentials.
+
+| Policy | Description |
+|--------|-------------|
+| `TechnicalSecurityBlockPolicy` | Block credentials/keys |
+| `TechnicalSecurityBlockPolicy_LLM` | Block with LLM message |
+| `TechnicalSecurityBlockPolicy_LLM_Finder` | LLM detection + block |
+| `TechnicalSecurityAnonymizePolicy` | Anonymize credentials |
+| `TechnicalSecurityReplacePolicy` | Replace with placeholder |
+| `TechnicalSecurityRaiseExceptionPolicy` | Raise exception |
+
+### Cybersecurity Threats
+
+Detects malware, exploits, and security vulnerabilities.
+
+| Policy | Description |
+|--------|-------------|
+| `CybersecurityBlockPolicy` | Block security threats |
+| `CybersecurityBlockPolicy_LLM` | Block with LLM message |
+| `CybersecurityBlockPolicy_LLM_Finder` | LLM detection + block |
+| `CybersecurityAnonymizePolicy` | Anonymize threat data |
+| `CybersecurityReplacePolicy` | Replace with placeholder |
+| `CybersecurityRaiseExceptionPolicy` | Raise exception |
+
+### Fraud Detection
+
+Detects fraud attempts, scams, and deceptive content.
+
+| Policy | Description |
+|--------|-------------|
+| `FraudDetectionBlockPolicy` | Block fraud attempts |
+| `FraudDetectionBlockPolicy_LLM` | Block with LLM message |
+| `FraudDetectionBlockPolicy_LLM_Finder` | LLM detection + block |
+| `FraudDetectionAnonymizePolicy` | Anonymize fraud data |
+| `FraudDetectionReplacePolicy` | Replace with placeholder |
+| `FraudDetectionRaiseExceptionPolicy` | Raise exception |
+
+### Phishing Detection
+
+Detects phishing attempts and suspicious URLs.
+
+| Policy | Description |
+|--------|-------------|
+| `PhishingBlockPolicy` | Block phishing content |
+| `PhishingBlockPolicy_LLM` | Block with LLM message |
+| `PhishingBlockPolicy_LLM_Finder` | LLM detection + block |
+| `PhishingAnonymizePolicy` | Anonymize phishing data |
+| `PhishingReplacePolicy` | Replace with placeholder |
+| `PhishingRaiseExceptionPolicy` | Raise exception |
+
+### Insider Threats
+
+Detects data exfiltration and insider threat indicators.
+
+| Policy | Description |
+|--------|-------------|
+| `InsiderThreatBlockPolicy` | Block insider threats |
+| `InsiderThreatBlockPolicy_LLM` | Block with LLM message |
+| `InsiderThreatBlockPolicy_LLM_Finder` | LLM detection + block |
+| `InsiderThreatAnonymizePolicy` | Anonymize threat data |
+| `InsiderThreatReplacePolicy` | Replace with placeholder |
+| `InsiderThreatRaiseExceptionPolicy` | Raise exception |
+
+## Tool Safety Policies
+
+Protects against harmful or malicious tool usage.
+
+### Harmful Tools
+
+Detects attempts to use dangerous or unauthorized tools.
+
+<CodeGroup>
+
+```python Block Harmful Tools
+from upsonic.safety_engine import HarmfulToolBlockPolicy
+
+agent = Direct(
+    model="openai/gpt-4o",
+    tools=[my_tools],
+    safety_policies=[HarmfulToolBlockPolicy]
+)
+
+# Blocks attempts to use harmful tools
+```
+
+</CodeGroup>
+
+| Policy | Description |
+|--------|-------------|
+| `HarmfulToolBlockPolicy` | Block harmful tool usage |
+| `HarmfulToolBlockPolicy_LLM` | Block with LLM message |
+| `HarmfulToolRaiseExceptionPolicy` | Raise exception |
+| `HarmfulToolRaiseExceptionPolicy_LLM` | Exception with LLM |
+
+### Malicious Tool Calls
+
+Detects malicious parameters or tool call patterns.
+
+| Policy | Description |
+|--------|-------------|
+| `MaliciousToolCallBlockPolicy` | Block malicious calls |
+| `MaliciousToolCallBlockPolicy_LLM` | Block with LLM message |
+| `MaliciousToolCallRaiseExceptionPolicy` | Raise exception |
+| `MaliciousToolCallRaiseExceptionPolicy_LLM` | Exception with LLM |
+
+## Legal & Compliance Policies
+
+Protects legal documents and compliance-sensitive information.
+
+| Policy | Description |
+|--------|-------------|
+| `LegalInfoBlockPolicy` | Block legal information |
+| `LegalInfoBlockPolicy_LLM` | Block with LLM message |
+| `LegalInfoBlockPolicy_LLM_Finder` | LLM detection + block |
+| `LegalInfoAnonymizePolicy` | Anonymize legal data |
+| `LegalInfoReplacePolicy` | Replace with placeholder |
+| `LegalInfoRaiseExceptionPolicy` | Raise exception |
+| `LegalInfoRaiseExceptionPolicy_LLM` | Exception with LLM message |
+
+## Anonymization Patterns
+
+The Safety Engine uses reversible anonymization to protect sensitive data:
+
+### How Anonymization Works
+
+1. **Detection**: Rule detects sensitive data (e.g., `john@example.com`)
+2. **Anonymization**: Replaced with random values preserving format (e.g., `xkqp@fhsmwtr.lzn`)
+3. **LLM Processing**: LLM sees anonymized version
+4. **De-anonymization**: Response is restored to original (e.g., `john@example.com`)
+
+### Character Replacement Rules
+
+- **Digits** → Random digits (`123` → `847`)
+- **Uppercase letters** → Random uppercase (`ABC` → `XKQ`)
+- **Lowercase letters** → Random lowercase (`abc` → `pzn`)
+- **Special characters** → Preserved (`@`, `-`, `.` stay the same)
+
+### Example
+
+```python
+from upsonic.safety_engine import PIIAnonymizePolicy
+
+agent = Direct(
+    model="openai/gpt-4o",
+    safety_policies=[PIIAnonymizePolicy]
+)
+
+# Original input
+input_text = "Send payment to john@example.com for account 1234-5678"
+
+# What LLM sees (anonymized)
+# "Send payment to xkqp@fhsmwtr.lzn for account 8472-3951"
+
+# LLM response
+# "Payment sent to xkqp@fhsmwtr.lzn from account 8472-3951"
+
+# De-anonymized output
+result = agent.run(input_text)
+# "Payment sent to john@example.com from account 1234-5678"
+```
+
+## Combining Multiple Policies
+
+You can apply multiple policies simultaneously:
+
+```python
+from upsonic.safety_engine import (
+    PIIAnonymizePolicy,
+    FinancialInfoAnonymizePolicy,
+    ProfanityBlockPolicy,
+    CryptoBlockPolicy
+)
+
+agent = Direct(
+    model="openai/gpt-4o",
+    safety_policies=[
+        PIIAnonymizePolicy,           # Anonymize PII
+        FinancialInfoAnonymizePolicy, # Anonymize financial data
+        ProfanityBlockPolicy,         # Block profanity
+        CryptoBlockPolicy             # Block crypto content
+    ]
+)
+
+# PII and financial data are anonymized
+# Profanity and crypto content are blocked
+```
+
+## Policy Execution Order
+
+Policies are executed in the order specified:
+
+1. **Input Processing**: Each policy's rule checks the input
+2. **Action Execution**: If rule triggers, action is taken
+3. **Blocking**: If any policy blocks, execution stops
+4. **Anonymization**: Transformations are applied cumulatively
+5. **LLM Call**: Modified input is sent to LLM
+6. **De-anonymization**: Response is restored using transformation maps
+
+## Exception Handling
+
+```python
+from upsonic.safety_engine import PIIRaiseExceptionPolicy, DisallowedOperation
+
+try:
+    agent = Direct(
+        model="openai/gpt-4o",
+        safety_policies=[PIIRaiseExceptionPolicy]
+    )
+    result = agent.run("My SSN is 123-45-6789")
+except DisallowedOperation as e:
+    # Handle policy violation
+    print(f"Safety policy violation: {e}")
+    # Log, alert, or take corrective action
+```

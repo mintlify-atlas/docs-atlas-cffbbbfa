@@ -1,0 +1,471 @@
+---
+title: Custom Tools
+description: Creating custom tools, tool registration, and extending agent capabilities
+---
+
+# Custom Tools
+
+Learn how to create and register custom tools that extend your agent's capabilities. Tools enable agents to interact with external systems, perform calculations, access databases, and more.
+
+## Tool System Overview
+
+Upsonic's tool system supports:
+
+- **Function Tools**: Simple Python functions decorated with `@tool`
+- **Class-Based Tools**: Structured tool implementations
+- **ToolKits**: Collections of related tools
+- **Agent Tools**: Use other agents as tools
+- **MCP Tools**: Model Context Protocol integration
+- **Builtin Tools**: Pre-built tools for common tasks
+
+Reference: `src/upsonic/tools/__init__.py:1-12`
+
+## Creating Function Tools
+
+<Steps>
+  <Step title="Basic Function Tool">
+    Create a simple tool using the `@tool` decorator:
+
+    ```python
+    from upsonic.tools import tool
+    from datetime import datetime
+
+    @tool
+    def get_current_time() -> str:
+        """Get the current time in ISO format."""
+        return datetime.now().isoformat()
+
+    @tool
+    def calculate_age(birth_year: int) -> int:
+        """Calculate age from birth year.
+        
+        Args:
+            birth_year: The year the person was born
+            
+        Returns:
+            The person's current age
+        """
+        return datetime.now().year - birth_year
+    ```
+  </Step>
+
+  <Step title="Register with Agent">
+    Add tools to your agent:
+
+    ```python
+    from upsonic import Agent, Task
+
+    agent = Agent(
+        model="openai/gpt-4o",
+        tools=[get_current_time, calculate_age]
+    )
+
+    result = agent.do(Task("What time is it?"))
+    ```
+  </Step>
+
+  <Step title="Dynamic Tool Addition">
+    Add tools after agent creation:
+
+    ```python
+    agent = Agent("openai/gpt-4o")
+    
+    # Add tools dynamically
+    agent.add_tools([get_current_time, calculate_age])
+    ```
+
+    Reference: `src/upsonic/agent/agent.py:1219-1280`
+  </Step>
+</Steps>
+
+## Tool Configuration
+
+### ToolConfig Options
+
+Customize tool behavior with `ToolConfig`:
+
+```python
+from upsonic.tools import tool, ToolConfig
+
+@tool(config=ToolConfig(
+    cache_enabled=True,
+    cache_ttl=3600,  # Cache for 1 hour
+    require_confirmation=True,  # Ask user before execution
+    confirmation_message="Execute database query?",
+    max_retries=3,
+    retry_delay=1.0
+))
+def query_database(sql: str) -> list:
+    """Execute a database query."""
+    # Implementation
+    pass
+```
+
+Reference: `src/upsonic/tools/config.py`
+
+### Tool Hooks
+
+Add lifecycle hooks for monitoring and control:
+
+```python
+from upsonic.tools import ToolHooks
+
+def before_tool_call(tool_name: str, args: dict) -> None:
+    print(f"Calling {tool_name} with {args}")
+
+def after_tool_call(tool_name: str, result: any) -> None:
+    print(f"{tool_name} returned: {result}")
+
+def on_tool_error(tool_name: str, error: Exception) -> None:
+    print(f"{tool_name} failed: {error}")
+
+hooks = ToolHooks(
+    before_call=before_tool_call,
+    after_call=after_tool_call,
+    on_error=on_tool_error
+)
+
+@tool(config=ToolConfig(hooks=hooks))
+def monitored_function() -> str:
+    return "Success"
+```
+
+## ToolKit Classes
+
+Create collections of related tools:
+
+```python
+from upsonic.tools import ToolKit, tool
+import requests
+
+class WeatherToolKit(ToolKit):
+    """Tools for weather information."""
+    
+    def __init__(self, api_key: str):
+        self.api_key = api_key
+    
+    @tool
+    def get_temperature(self, city: str) -> float:
+        """Get current temperature for a city.
+        
+        Args:
+            city: Name of the city
+            
+        Returns:
+            Temperature in Celsius
+        """
+        response = requests.get(
+            f"https://api.weather.com/v1/current",
+            params={"city": city, "key": self.api_key}
+        )
+        return response.json()["temperature"]
+    
+    @tool
+    def get_forecast(self, city: str, days: int = 7) -> list:
+        """Get weather forecast for a city.
+        
+        Args:
+            city: Name of the city
+            days: Number of days to forecast (default: 7)
+            
+        Returns:
+            List of daily forecasts
+        """
+        # Implementation
+        pass
+
+# Use the toolkit
+weather_tools = WeatherToolKit(api_key="your_api_key")
+
+agent = Agent(
+    model="openai/gpt-4o",
+    tools=[weather_tools]
+)
+```
+
+Reference: `src/upsonic/tools/base.py`
+
+## Agent as Tool
+
+Use agents as tools for other agents:
+
+```python
+from upsonic import Agent, Task
+
+# Create a specialized agent
+math_agent = Agent(
+    model="openai/gpt-4o",
+    name="Math Specialist",
+    role="Mathematics Expert",
+    goal="Solve complex mathematical problems"
+)
+
+# Use it as a tool
+general_agent = Agent(
+    model="openai/gpt-4o",
+    name="General Assistant",
+    tools=[math_agent]  # Agent acts as a tool
+)
+
+# The general agent can delegate to math agent
+result = general_agent.do(
+    Task("What is the derivative of x^2 + 3x?")
+)
+```
+
+## Builtin Tools
+
+Upsonic provides pre-built tools for common tasks:
+
+### Web Search
+
+```python
+from upsonic.tools.builtin_tools import WebSearch
+
+web_search = WebSearch()
+
+agent = Agent(
+    model="openai/gpt-4o",
+    tools=[web_search]
+)
+
+result = agent.do(Task("Find latest news about AI"))
+```
+
+### Code Execution
+
+```python
+from upsonic.tools.builtin_tools import CodeExecutionTool
+
+code_tool = CodeExecutionTool()
+
+agent = Agent(
+    model="openai/gpt-4o",
+    tools=[code_tool]
+)
+```
+
+### URL Context
+
+```python
+from upsonic.tools.builtin_tools import UrlContextTool
+
+url_tool = UrlContextTool()
+
+agent = Agent(
+    model="openai/gpt-4o",
+    tools=[url_tool]
+)
+```
+
+Reference: `src/upsonic/tools/builtin_tools.py`
+
+## Advanced Patterns
+
+### Async Tools
+
+Create async tools for I/O operations:
+
+```python
+import asyncio
+import aiohttp
+from upsonic.tools import tool
+
+@tool
+async def fetch_data(url: str) -> dict:
+    """Fetch data from a URL asynchronously.
+    
+    Args:
+        url: The URL to fetch data from
+        
+    Returns:
+        JSON response data
+    """
+    async with aiohttp.ClientSession() as session:
+        async with session.get(url) as response:
+            return await response.json()
+```
+
+### Stateful Tools
+
+Maintain state across tool calls:
+
+```python
+class DatabaseToolKit(ToolKit):
+    def __init__(self, connection_string: str):
+        self.connection = self._connect(connection_string)
+        self.query_count = 0
+    
+    @tool
+    def execute_query(self, sql: str) -> list:
+        """Execute SQL query."""
+        self.query_count += 1
+        return self.connection.execute(sql).fetchall()
+    
+    @tool
+    def get_stats(self) -> dict:
+        """Get database statistics."""
+        return {
+            "queries_executed": self.query_count,
+            "connection_active": self.connection.is_connected()
+        }
+```
+
+### Error Handling
+
+```python
+from upsonic.tools import tool, ToolConfig
+
+@tool(config=ToolConfig(
+    max_retries=3,
+    retry_delay=2.0
+))
+def unreliable_api_call(endpoint: str) -> dict:
+    """Call an unreliable API with automatic retries.
+    
+    Args:
+        endpoint: API endpoint to call
+        
+    Returns:
+        API response data
+        
+    Raises:
+        ConnectionError: If API is unavailable after retries
+    """
+    try:
+        response = requests.get(endpoint, timeout=5)
+        response.raise_for_status()
+        return response.json()
+    except requests.exceptions.RequestException as e:
+        raise ConnectionError(f"API call failed: {e}")
+```
+
+## Tool Best Practices
+
+<Tip>
+**Clear Docstrings**: Write detailed docstrings. The LLM uses them to understand when and how to use your tool:
+
+```python
+@tool
+def send_email(to: str, subject: str, body: str) -> bool:
+    """Send an email using SMTP.
+    
+    Use this tool when the user asks to send an email, notify someone,
+    or share information via email.
+    
+    Args:
+        to: Recipient email address (must be valid format)
+        subject: Email subject line (keep under 100 characters)
+        body: Email body content (can include HTML)
+        
+    Returns:
+        True if email sent successfully, False otherwise
+        
+    Examples:
+        - "Send an email to john@example.com about the meeting"
+        - "Notify the team about the deployment"
+    """
+    # Implementation
+    pass
+```
+</Tip>
+
+<Tip>
+**Type Hints**: Always include type hints for parameters and return values. This helps with schema generation:
+
+```python
+from typing import List, Dict, Optional
+
+@tool
+def analyze_data(
+    data: List[Dict[str, any]],
+    metric: str,
+    threshold: Optional[float] = None
+) -> Dict[str, any]:
+    """Analyze data for insights."""
+    pass
+```
+</Tip>
+
+<Warning>
+**Security**: Never expose dangerous operations without confirmation:
+
+```python
+@tool(config=ToolConfig(
+    require_confirmation=True,
+    confirmation_message="Delete all files in directory?"
+))
+def delete_directory(path: str) -> None:
+    """Delete a directory and all contents."""
+    # Requires user approval before execution
+    pass
+```
+</Warning>
+
+<Tip>
+**Caching**: Enable caching for expensive operations:
+
+```python
+@tool(config=ToolConfig(
+    cache_enabled=True,
+    cache_ttl=3600  # 1 hour
+))
+def expensive_calculation(n: int) -> int:
+    """Perform expensive calculation."""
+    # Result cached for repeated calls
+    pass
+```
+</Tip>
+
+<Note>
+**Tool Limits**: Set reasonable limits on tool execution to prevent infinite loops:
+
+```python
+agent = Agent(
+    model="openai/gpt-4o",
+    tools=[my_tools],
+    tool_call_limit=100  # Maximum 100 tool calls per task
+)
+```
+</Note>
+
+## Tool Schema Generation
+
+Upsonic automatically generates schemas from your tools:
+
+```python
+from upsonic.tools import function_schema
+
+@tool
+def calculate_discount(price: float, discount_percent: int) -> float:
+    """Calculate discounted price.
+    
+    Args:
+        price: Original price in dollars
+        discount_percent: Discount percentage (0-100)
+    """
+    return price * (1 - discount_percent / 100)
+
+# Schema is automatically generated:
+# {
+#   "name": "calculate_discount",
+#   "description": "Calculate discounted price.",
+#   "parameters": {
+#     "type": "object",
+#     "properties": {
+#       "price": {"type": "number", "description": "Original price in dollars"},
+#       "discount_percent": {"type": "integer", "description": "Discount percentage (0-100)"}
+#     },
+#     "required": ["price", "discount_percent"]
+#   }
+# }
+```
+
+Reference: `src/upsonic/tools/schema.py`
+
+## Next Steps
+
+- [Building Agents](/guides/building-agents) - Learn to use tools with agents
+- [Multi-Agent Workflows](/guides/multi-agent-workflows) - Share tools across teams
+- [RAG Knowledge Base](/guides/rag-knowledge-base) - Use KnowledgeBase as a tool
+- [Safety Policies](/guides/safety-policies) - Add safety checks to tools

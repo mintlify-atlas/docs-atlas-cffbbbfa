@@ -1,0 +1,357 @@
+---
+title: 'Model Settings'
+description: 'ModelSettings, ModelRequest, and ModelResponse classes for configuring and handling model interactions'
+---
+
+# Model Settings
+
+Model settings classes control how AI models behave and handle requests/responses.
+
+## ModelSettings
+
+Base settings class that applies to multiple model providers.
+
+```python
+from upsonic.models.settings import ModelSettings
+
+settings: ModelSettings = {
+    'max_tokens': 1000,
+    'temperature': 0.7,
+    'top_p': 0.9,
+}
+```
+
+### Common Settings
+
+These settings are supported by most models:
+
+#### max_tokens
+
+**Type:** `int`
+
+The maximum number of tokens to generate before stopping.
+
+**Supported by:** Gemini, Anthropic, OpenAI, Groq, Cohere, Mistral, Bedrock, MCP Sampling, Outlines
+
+```python
+settings = {'max_tokens': 2000}
+```
+
+#### temperature
+
+**Type:** `float`
+
+Amount of randomness injected into the response. Use values closer to `0.0` for analytical/multiple choice tasks, and closer to a model's maximum for creative and generative tasks.
+
+Note: Even with `temperature` of `0.0`, results will not be fully deterministic.
+
+**Supported by:** Gemini, Anthropic, OpenAI, Groq, Cohere, Mistral, Bedrock, Outlines (Transformers, LlamaCpp, SgLang, VLLMOffline)
+
+```python
+settings = {'temperature': 0.7}
+```
+
+#### top_p
+
+**Type:** `float`
+
+Nucleus sampling - the model considers results of tokens with top_p probability mass. For example, `0.1` means only tokens in the top 10% probability mass are considered.
+
+You should alter either `temperature` or `top_p`, but not both.
+
+**Supported by:** Gemini, Anthropic, OpenAI, Groq, Cohere, Mistral, Bedrock, Outlines (Transformers, LlamaCpp, SgLang, VLLMOffline)
+
+```python
+settings = {'top_p': 0.9}
+```
+
+#### timeout
+
+**Type:** `float | httpx.Timeout`
+
+Override the client-level default timeout for a request, in seconds.
+
+**Supported by:** Gemini, Anthropic, OpenAI, Groq, Mistral
+
+```python
+settings = {'timeout': 30.0}
+```
+
+#### parallel_tool_calls
+
+**Type:** `bool`
+
+Whether to allow parallel tool calls.
+
+**Supported by:** OpenAI (some models, not o1), Groq, Anthropic
+
+```python
+settings = {'parallel_tool_calls': True}
+```
+
+#### seed
+
+**Type:** `int`
+
+The random seed to use for the model, theoretically allowing for deterministic results.
+
+**Supported by:** OpenAI, Groq, Cohere, Mistral, Gemini, Outlines (LlamaCpp, VLLMOffline)
+
+```python
+settings = {'seed': 42}
+```
+
+#### presence_penalty
+
+**Type:** `float`
+
+Penalize new tokens based on whether they have appeared in the text so far.
+
+**Supported by:** OpenAI, Groq, Cohere, Gemini, Mistral, Outlines (LlamaCpp, SgLang, VLLMOffline)
+
+```python
+settings = {'presence_penalty': 0.5}
+```
+
+#### frequency_penalty
+
+**Type:** `float`
+
+Penalize new tokens based on their existing frequency in the text so far.
+
+**Supported by:** OpenAI, Groq, Cohere, Gemini, Mistral, Outlines (LlamaCpp, SgLang, VLLMOffline)
+
+```python
+settings = {'frequency_penalty': 0.5}
+```
+
+#### logit_bias
+
+**Type:** `dict[str, int]`
+
+Modify the likelihood of specified tokens appearing in the completion.
+
+**Supported by:** OpenAI, Groq, Outlines (Transformers, LlamaCpp, VLLMOffline)
+
+```python
+settings = {'logit_bias': {'50256': -100}}  # Suppress specific token
+```
+
+#### stop_sequences
+
+**Type:** `list[str]`
+
+Sequences that will cause the model to stop generating.
+
+**Supported by:** OpenAI, Anthropic, Bedrock, Mistral, Groq, Cohere, Google
+
+```python
+settings = {'stop_sequences': ['END', 'STOP']}
+```
+
+#### extra_headers
+
+**Type:** `dict[str, str]`
+
+Extra headers to send to the model.
+
+**Supported by:** OpenAI, Anthropic, Groq
+
+```python
+settings = {'extra_headers': {'X-Custom-Header': 'value'}}
+```
+
+#### extra_body
+
+**Type:** `object`
+
+Extra body to send to the model.
+
+**Supported by:** OpenAI, Anthropic, Groq, Outlines (all providers)
+
+```python
+settings = {'extra_body': {'custom_field': 'value'}}
+```
+
+## Provider-Specific Settings
+
+### OpenAI Settings
+
+#### OpenAIChatModelSettings
+
+```python
+from upsonic.models.openai import OpenAIChatModelSettings
+
+settings: OpenAIChatModelSettings = {
+    'openai_reasoning_effort': 'medium',  # 'low', 'medium', 'high'
+    'openai_logprobs': True,
+    'openai_top_logprobs': 5,
+    'openai_user': 'user-123',
+    'openai_service_tier': 'auto',  # 'auto', 'default', 'flex', 'priority'
+    'openai_prediction': {...},  # For predictive outputs
+}
+```
+
+#### OpenAIResponsesModelSettings
+
+```python
+from upsonic.models.openai import OpenAIResponsesModelSettings
+
+settings: OpenAIResponsesModelSettings = {
+    'openai_builtin_tools': [{'type': 'file_search'}],
+    'openai_reasoning_summary': 'detailed',  # 'detailed' or 'concise'
+    'openai_send_reasoning_ids': True,
+    'openai_truncation': 'auto',  # 'disabled' or 'auto'
+    'openai_text_verbosity': 'medium',  # 'low', 'medium', 'high'
+    'openai_previous_response_id': 'auto',
+    'openai_include_code_execution_outputs': True,
+    'openai_include_web_search_sources': True,
+}
+```
+
+### Anthropic Settings
+
+#### AnthropicModelSettings
+
+```python
+from upsonic.models.anthropic import AnthropicModelSettings
+
+settings: AnthropicModelSettings = {
+    'anthropic_metadata': {
+        'user_id': 'user-123'
+    },
+    'anthropic_thinking': {
+        'type': 'enabled',
+        'budget_tokens': 10000
+    },
+    'anthropic_cache_tool_definitions': True,
+    'anthropic_cache_instructions': True,
+}
+```
+
+### Bedrock Settings
+
+#### BedrockModelSettings
+
+```python
+from upsonic.models.bedrock import BedrockModelSettings
+
+settings: BedrockModelSettings = {
+    'bedrock_guardrail_config': {
+        'guardrailIdentifier': 'string',
+        'guardrailVersion': 'string'
+    },
+    'bedrock_performance_configuration': {
+        'latency': 'standard'  # or 'optimized'
+    },
+    'bedrock_request_metadata': {
+        'custom_key': 'custom_value'
+    },
+    'bedrock_additional_model_response_fields_paths': ['/field1', '/field2'],
+    'bedrock_prompt_variables': {
+        'variable1': {'text': 'value1'}
+    },
+    'bedrock_additional_model_requests_fields': {
+        'custom_field': 'value'
+    },
+}
+```
+
+### Google Settings
+
+#### GoogleModelSettings
+
+```python
+from upsonic.models.google import GoogleModelSettings
+
+settings: GoogleModelSettings = {
+    'google_safety_settings': [
+        {
+            'category': 'HARM_CATEGORY_DANGEROUS_CONTENT',
+            'threshold': 'BLOCK_MEDIUM_AND_ABOVE'
+        }
+    ],
+    'google_thinking_config': {
+        'thinking_mode': 'enabled'
+    },
+    'google_labels': {
+        'environment': 'production'
+    },
+    'google_video_resolution': 'high',  # 'low', 'medium', 'high'
+    'google_cached_content': 'cache-id-123',
+}
+```
+
+### Groq Settings
+
+#### GroqModelSettings
+
+```python
+from upsonic.models.groq import GroqModelSettings
+
+settings: GroqModelSettings = {
+    'groq_reasoning_format': 'parsed',  # 'hidden', 'raw', 'parsed'
+}
+```
+
+### Mistral Settings
+
+#### MistralModelSettings
+
+```python
+from upsonic.models.mistral import MistralModelSettings
+
+# Currently a placeholder for future Mistral-specific settings
+settings: MistralModelSettings = {}
+```
+
+## Merging Settings
+
+Settings can be merged, with later settings overriding earlier ones:
+
+```python
+from upsonic.models.settings import merge_model_settings
+
+base_settings = {'temperature': 0.7, 'max_tokens': 1000}
+override_settings = {'temperature': 0.9}
+
+final_settings = merge_model_settings(base_settings, override_settings)
+# Result: {'temperature': 0.9, 'max_tokens': 1000}
+```
+
+## Usage with Agents
+
+Settings can be specified at multiple levels:
+
+```python
+from upsonic import Agent
+from upsonic.models.openai import OpenAIChatModel
+
+# Model-level defaults
+model = OpenAIChatModel(
+    model_name='gpt-4o',
+    settings={'temperature': 0.7}
+)
+
+# Agent-level defaults
+agent = Agent(
+    model=model,
+    model_settings={'max_tokens': 2000}
+)
+
+# Run-level overrides
+result = agent.run(
+    "What is the capital of France?",
+    model_settings={'temperature': 0.9}  # Overrides agent and model settings
+)
+```
+
+The final settings are merged in this order:
+1. Model default settings
+2. Agent model_settings
+3. Run model_settings (highest priority)
+
+## Related
+
+- [Model Providers](/api/models/providers) - Available model providers
+- [Agents](/guides/agents) - Using settings with agents

@@ -1,0 +1,382 @@
+---
+title: "Tool Base Classes"
+description: "Core tool interfaces, base classes, and tool registration system"
+---
+
+## Overview
+
+The Upsonic tools system provides a comprehensive framework for creating and managing AI agent tools. This module contains the core base classes, interfaces, and tool management functionality.
+
+## Tool Base Class
+
+The `Tool` class is the central base class for all tools in the Upsonic framework.
+
+### Tool
+
+**Location:** `src/upsonic/tools/base.py:49`
+
+```python
+class Tool:
+    """Central base class for all tools in the Upsonic framework."""
+    
+    def __init__(
+        self,
+        name: str,
+        description: Optional[str] = None,
+        schema: Optional[FunctionSchema] = None,
+        metadata: Optional[ToolMetadata] = None,
+        tool_id: Optional[str] = None,
+    )
+```
+
+#### Purpose
+
+- Standard tool interface (name, description, metadata)
+- Metrics tracking for each tool instance
+- Abstract execute method for tool logic
+
+#### Parameters
+
+- `name` (str): Tool name
+- `description` (Optional[str]): Tool description
+- `schema` (Optional[FunctionSchema]): Tool's input schema
+- `metadata` (Optional[ToolMetadata]): Tool metadata
+- `tool_id` (Optional[str]): Unique identifier (auto-generated if not provided)
+
+#### Properties
+
+**metrics**
+```python
+@property
+def metrics(self) -> ToolMetrics:
+    """The metrics for this tool instance."""
+```
+
+#### Methods
+
+**execute()**
+```python
+async def execute(self, *args: Any, **kwargs: Any) -> Any:
+    """Execute the tool.
+    
+    This method must be implemented by all tool subclasses.
+    """
+```
+
+**record_execution()**
+```python
+def record_execution(
+    self, 
+    execution_time: float, 
+    args: Dict[str, Any] = None,
+    result: Any = None,
+    success: bool = True
+) -> None:
+    """Record a tool execution in metrics and history."""
+```
+
+#### Example Usage
+
+```python
+from upsonic.tools import Tool, ToolMetadata
+
+class MyTool(Tool):
+    def __init__(self):
+        super().__init__(
+            name="my_tool",
+            description="Does something useful",
+            metadata=ToolMetadata(name="my_tool", kind='function')
+        )
+    
+    async def execute(self, **kwargs):
+        # Tool logic here
+        result = perform_operation(kwargs)
+        return result
+
+# Use the tool
+tool = MyTool()
+result = await tool.execute(param1="value1")
+```
+
+---
+
+## ToolKit Base Class
+
+**Location:** `src/upsonic/tools/base.py:165`
+
+```python
+class ToolKit:
+    """Base class for organized tool collections.
+    
+    Only @tool decorated methods are exposed as tools.
+    """
+```
+
+### Example Usage
+
+```python
+from upsonic.tools import tool, ToolKit
+
+class MyToolKit(ToolKit):
+    @tool
+    def tool1(self, x: int) -> int:
+        '''Tool 1 description'''
+        return x * 2
+    
+    @tool
+    def tool2(self, y: str) -> str:
+        '''Tool 2 description'''
+        return y.upper()
+
+# Register toolkit with agent
+kit = MyToolKit()
+agent.tools = [kit]
+```
+
+---
+
+## ToolDefinition
+
+**Location:** `src/upsonic/tools/base.py:191`
+
+Tool definition passed to a language model.
+
+```python
+@dataclass
+class ToolDefinition:
+    """Tool definition passed to a model."""
+    
+    name: str
+    """The name of the tool."""
+    
+    parameters_json_schema: Dict[str, Any]
+    """The JSON schema for the tool's parameters."""
+    
+    description: Optional[str] = None
+    """The description of the tool."""
+    
+    kind: ToolKind = 'function'
+    """The kind of tool."""
+    
+    strict: Optional[bool] = None
+    """Whether to enforce strict JSON schema validation."""
+    
+    sequential: bool = False
+    """Whether this tool requires sequential execution."""
+    
+    metadata: Optional[Dict[str, Any]] = None
+    """Tool metadata not sent to the model."""
+```
+
+### Properties
+
+**defer**
+```python
+@property
+def defer(self) -> bool:
+    """Whether calls to this tool will be deferred."""
+    return self.kind in ('external', 'unapproved')
+```
+
+---
+
+## ToolMetadata
+
+**Location:** `src/upsonic/tools/base.py:28`
+
+Universal metadata for all tools.
+
+```python
+@dataclass
+class ToolMetadata:
+    """Universal metadata for all tools."""
+    name: str
+    description: Optional[str] = None
+    
+    kind: ToolKind = 'function'
+    """Type of tool ('function', 'output', 'external', 'unapproved', 'mcp')"""
+    
+    is_async: bool = False
+    """Whether the tool is async"""
+    
+    strict: bool = False
+    """Whether to use strict schema validation"""
+    
+    custom: Dict[str, Any] = field(default_factory=dict)
+    """Tool-specific metadata"""
+```
+
+---
+
+## ToolResult
+
+**Location:** `src/upsonic/tools/base.py:223`
+
+Internal representation of a tool execution result.
+
+```python
+@dataclass
+class ToolResult:
+    """Internal representation of a tool execution result."""
+    
+    tool_name: str
+    """The name of the tool that was called."""
+    
+    content: Any
+    """The return value."""
+    
+    tool_call_id: Optional[str] = None
+    """The tool call identifier."""
+    
+    success: bool = True
+    """Whether the tool execution was successful."""
+    
+    error: Optional[str] = None
+    """Error message if execution failed."""
+    
+    metadata: Optional[Dict[str, Any]] = None
+    """Additional metadata for the result."""
+    
+    execution_time: Optional[float] = None
+    """Time taken to execute the tool in seconds."""
+```
+
+---
+
+## ToolManager
+
+**Location:** `src/upsonic/tools/__init__.py:295`
+
+High-level manager for all tool operations including registration, execution, and removal.
+
+```python
+class ToolManager:
+    """High-level manager for all tool operations."""
+    
+    def __init__(self):
+        self.processor = ToolProcessor()
+        self.deferred_manager = DeferredExecutionManager()
+        self.orchestrator = None
+        self.wrapped_tools = {}
+        self.current_task = None
+```
+
+### Methods
+
+**register_tools()**
+```python
+def register_tools(
+    self,
+    tools: list,
+    task: Optional[Task] = None,
+    agent_instance: Optional[Any] = None
+) -> Dict[str, Tool]:
+    """Register tools with the manager.
+    
+    This is the MAIN registration method that:
+    1. Filters out already registered tools
+    2. Processes new tools via ToolProcessor
+    3. Creates behavioral wrappers
+    4. Handles plan_and_execute orchestrator
+    
+    Returns:
+        Dict of newly registered tools
+    """
+```
+
+**execute_tool()**
+```python
+async def execute_tool(
+    self,
+    tool_name: str,
+    args: Dict[str, Any],
+    metrics: Optional[ToolMetrics] = None,
+    tool_call_id: Optional[str] = None
+) -> ToolResult:
+    """Execute a tool by name using pre-wrapped executor."""
+```
+
+**get_tool_definitions()**
+```python
+def get_tool_definitions(self) -> List[ToolDefinition]:
+    """Get definitions for all registered tools."""
+```
+
+**remove_tools()**
+```python
+def remove_tools(
+    self,
+    tools: Union[Any, List[Any]],
+    registered_tools: Dict[str, Any]
+) -> tuple[List[str], List[Any]]:
+    """Remove tools from the manager.
+    
+    Handles ALL tool types:
+    - Tool names (strings)
+    - Function objects
+    - Agent objects
+    - MCP handlers
+    - Class instances (ToolKit or regular classes)
+    
+    Returns:
+        Tuple of (removed_tool_names, removed_original_objects)
+    """
+```
+
+### Example Usage
+
+```python
+from upsonic.tools import ToolManager, tool
+
+# Create manager
+manager = ToolManager()
+
+# Define tools
+@tool
+def add_numbers(a: int, b: int) -> int:
+    """Add two numbers together."""
+    return a + b
+
+# Register tools
+manager.register_tools([add_numbers])
+
+# Execute tool
+result = await manager.execute_tool(
+    tool_name="add_numbers",
+    args={"a": 5, "b": 3}
+)
+
+print(result.content)  # 8
+
+# Get all tool definitions
+definitions = manager.get_tool_definitions()
+
+# Remove tools
+manager.remove_tools(["add_numbers"], registered_tools={})
+```
+
+---
+
+## Type Aliases
+
+**ToolKind**
+```python
+ToolKind: TypeAlias = Literal['function', 'output', 'external', 'unapproved', 'mcp']
+```
+
+**DocstringFormat**
+```python
+DocstringFormat: TypeAlias = Literal['google', 'numpy', 'sphinx', 'auto']
+```
+
+**ObjectJsonSchema**
+```python
+ObjectJsonSchema: TypeAlias = Dict[str, Any]
+```
+
+---
+
+## Related
+
+- [Common Tools](/api/tools/common-tools) - Built-in tool implementations
+- [Tool Configuration](/api/tools/config) - Tool behavior configuration

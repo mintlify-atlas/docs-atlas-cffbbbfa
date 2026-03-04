@@ -1,0 +1,618 @@
+---
+title: Interface Integration
+description: Connect your agents to Slack, Gmail, Telegram, and WhatsApp for real-world interactions
+---
+
+Upsonic provides production-ready interfaces for connecting AI agents to popular messaging platforms. Each interface supports both task-based and conversational modes, with built-in security, webhook management, and rich media handling.
+
+## Overview
+
+Interfaces transform your agents into interactive bots that can:
+- Respond to messages in real-time
+- Maintain conversation context
+- Handle media (images, documents, audio)
+- Apply access control (whitelists)
+- Process webhooks securely
+
+**Supported platforms:**
+- Slack - Team messaging and collaboration
+- Gmail - Email automation and responses
+- Telegram - Messaging with rich media support
+- WhatsApp - Business messaging integration
+
+## Quick Start
+
+### Basic Interface Setup
+
+```python
+from upsonic import Agent
+from upsonic.interfaces import InterfaceManager, SlackInterface
+
+agent = Agent("anthropic/claude-sonnet-4-5")
+slack = SlackInterface(agent=agent)
+
+manager = InterfaceManager(interfaces=[slack])
+manager.serve(port=8000)
+```
+
+### Using with CLI
+
+Create a `main.py` that returns an `InterfaceManager`:
+
+```python
+from upsonic import Agent
+from upsonic.interfaces import InterfaceManager, TelegramInterface
+
+async def main(inputs):
+    agent = Agent("openai/gpt-4o")
+    telegram = TelegramInterface(
+        agent=agent,
+        webhook_url="https://your-domain.ngrok-free.app"
+    )
+    return InterfaceManager(interfaces=[telegram])
+```
+
+Run with:
+```bash
+upsonic run
+# Automatically detects InterfaceManager and starts interface server
+```
+
+## Operating Modes
+
+All interfaces support two operating modes:
+
+### Task Mode (Default)
+
+Each message is processed as an independent task - no conversation history.
+
+```python
+from upsonic.interfaces import SlackInterface, InterfaceMode
+
+slack = SlackInterface(
+    agent=agent,
+    mode=InterfaceMode.TASK  # or mode="task"
+)
+```
+
+**Use cases:**
+- Command execution
+- Stateless queries
+- High-volume request processing
+
+### Chat Mode
+
+Messages from the same user continue a conversation session with full history.
+
+```python
+from upsonic.interfaces import GmailInterface, InterfaceMode
+from upsonic.storage import RedisStorage
+
+storage = RedisStorage(url="redis://localhost:6379")
+
+gmail = GmailInterface(
+    agent=agent,
+    mode=InterfaceMode.CHAT,  # or mode="chat"
+    storage=storage,  # Persist conversations
+    reset_command="/reset"  # Users can reset their session
+)
+```
+
+**Features:**
+- Persistent conversation history
+- Context-aware responses
+- User-specific sessions
+- Reset command support
+
+**Use cases:**
+- Customer support
+- Personal assistants
+- Multi-turn interactions
+
+## Slack Interface
+
+### Setup
+
+1. **Create Slack App:**
+   - Go to [api.slack.com/apps](https://api.slack.com/apps)
+   - Create new app
+   - Add bot token scopes: `chat:write`, `app_mentions:read`, `channels:history`
+   - Install app to workspace
+
+2. **Configure environment:**
+```bash
+export SLACK_BOT_TOKEN="xoxb-your-bot-token"
+export SLACK_SIGNING_SECRET="your-signing-secret"
+```
+
+### Basic Usage
+
+```python
+from upsonic import Agent
+from upsonic.interfaces import SlackInterface, InterfaceManager
+
+agent = Agent("anthropic/claude-sonnet-4-5")
+
+slack = SlackInterface(
+    agent=agent,
+    name="Support Bot",
+    mode="chat",
+    reply_to_mentions_only=True,  # Only respond to @mentions
+    stream=True  # Stream responses in real-time
+)
+
+manager = InterfaceManager(interfaces=[slack])
+manager.serve(port=8000)
+```
+
+### Advanced Configuration
+
+```python
+from upsonic.interfaces import SlackInterface
+from upsonic.storage import PostgresStorage
+
+storage = PostgresStorage(url="postgresql://user:pass@localhost/db")
+
+slack = SlackInterface(
+    agent=agent,
+    signing_secret="your-signing-secret",
+    mode="chat",
+    storage=storage,
+    allowed_user_ids=["U01ABC123", "U02DEF456"],  # Whitelist
+    stream=True,
+    heartbeat_channel="C01ABC123"  # For autonomous agents
+)
+```
+
+### Webhook Setup
+
+1. **Expose your server:**
+```bash
+# Using ngrok
+ngrok http 8000
+```
+
+2. **Configure Slack webhook:**
+   - Event Subscriptions → Enable Events
+   - Request URL: `https://your-domain.ngrok-free.app/slack/events`
+   - Subscribe to: `app_mention`, `message.im`
+
+### Features
+
+- **Signature verification** - Validates all webhook requests
+- **Event deduplication** - Prevents duplicate processing
+- **Thread support** - Replies in threads
+- **Typing indicators** - Shows bot is typing
+- **Message streaming** - Progressive message updates
+- **Whitelist control** - Restrict access by user ID
+
+---
+
+## Gmail Interface
+
+### Setup
+
+1. **Enable Gmail API:**
+   - Go to [Google Cloud Console](https://console.cloud.google.com)
+   - Create project
+   - Enable Gmail API
+   - Create OAuth 2.0 credentials
+   - Download `credentials.json`
+
+2. **Authenticate:**
+```python
+from upsonic.tools.custom_tools.gmail import GmailTools
+
+# First time: opens browser for OAuth
+tools = GmailTools(
+    credentials_path="credentials.json",
+    token_path="token.json"
+)
+```
+
+### Basic Usage
+
+```python
+from upsonic import Agent
+from upsonic.interfaces import GmailInterface, InterfaceManager
+
+agent = Agent("openai/gpt-4o")
+
+gmail = GmailInterface(
+    agent=agent,
+    credentials_path="credentials.json",
+    token_path="token.json",
+    mode="chat"
+)
+
+manager = InterfaceManager(interfaces=[gmail])
+manager.serve(port=8000)
+```
+
+### Processing Emails
+
+```python
+gmail = GmailInterface(
+    agent=agent,
+    mode="task",  # Each email is independent
+    api_secret="your-secret-token",
+    allowed_emails=["user@example.com"]  # Whitelist
+)
+
+manager = InterfaceManager(interfaces=[gmail])
+manager.serve(port=8000)
+```
+
+### Trigger Email Check
+
+```bash
+# Manual trigger via API
+curl -X POST http://localhost:8000/gmail/check?count=10 \
+  -H "X-Upsonic-Gmail-Secret: your-secret-token"
+```
+
+### Features
+
+- **Smart email triage** - Agent decides to reply or ignore
+- **Structured responses** - Uses Pydantic models for decisions
+- **Thread handling** - Maintains email conversations
+- **Whitelist control** - Restrict by email address
+- **Mark as read** - Automatic email management
+
+### Response Format
+
+In task mode, the agent receives:
+```python
+{
+    "action": "reply" | "ignore",
+    "reasoning": "Brief explanation",
+    "reply_body": "Email response text"
+}
+```
+
+---
+
+## Telegram Interface
+
+### Setup
+
+1. **Create bot:**
+   - Message [@BotFather](https://t.me/botfather) on Telegram
+   - Send `/newbot`
+   - Follow prompts to get bot token
+
+2. **Configure environment:**
+```bash
+export TELEGRAM_BOT_TOKEN="123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11"
+export TELEGRAM_WEBHOOK_SECRET="your-webhook-secret"  # Optional
+```
+
+### Basic Usage
+
+```python
+from upsonic import Agent
+from upsonic.interfaces import TelegramInterface, InterfaceManager
+
+agent = Agent("anthropic/claude-sonnet-4-5")
+
+telegram = TelegramInterface(
+    agent=agent,
+    webhook_url="https://your-domain.ngrok-free.app",
+    mode="chat",
+    stream=True
+)
+
+manager = InterfaceManager(interfaces=[telegram])
+manager.serve(port=8000)
+```
+
+### Advanced Configuration
+
+```python
+telegram = TelegramInterface(
+    agent=agent,
+    bot_token="your-token",
+    webhook_url="https://your-domain.ngrok-free.app",
+    webhook_secret="your-secret",
+    mode="chat",
+    allowed_user_ids=[123456789, 987654321],  # Whitelist
+    parse_mode="HTML",  # "Markdown", "MarkdownV2", or None
+    typing_indicator=True,
+    stream=True,
+    reply_in_groups=True,
+    reply_in_channels=False,
+    process_edited_messages=False,
+    heartbeat_chat_id=123456789  # For autonomous agents
+)
+```
+
+### Media Handling
+
+Telegram interface supports:
+- **Text messages** - Standard text processing
+- **Photos** - Automatic download and vision processing
+- **Documents** - PDF, Office files, text files
+- **Audio** - Voice messages and audio files
+- **Video** - Video file processing
+- **Stickers** - Emoji extraction
+- **Location** - GPS coordinates
+- **Contacts** - vCard data
+
+```python
+# Agent automatically handles all media types
+# User sends image → agent analyzes → responds
+```
+
+### Webhook Management
+
+```bash
+# Set webhook
+curl -X POST http://localhost:8000/telegram/set-webhook \
+  -H "Content-Type: application/json" \
+  -d '{"url": "https://your-domain.ngrok-free.app/telegram/webhook"}'
+
+# Check webhook status
+curl http://localhost:8000/telegram/webhook-info
+
+# Delete webhook
+curl -X POST http://localhost:8000/telegram/delete-webhook
+```
+
+### Features
+
+- **All message types** - Text, media, location, contacts
+- **Inline keyboards** - Callback query support
+- **Typing indicators** - Shows bot is typing
+- **Message streaming** - Real-time updates
+- **File downloads** - Automatic media retrieval
+- **Whitelist control** - User ID restrictions
+
+---
+
+## WhatsApp Interface
+
+### Setup
+
+1. **Create WhatsApp Business App:**
+   - Go to [Facebook Developers](https://developers.facebook.com)
+   - Create app → WhatsApp → Business
+   - Get phone number ID and access token
+
+2. **Configure environment:**
+```bash
+export WHATSAPP_ACCESS_TOKEN="your-access-token"
+export WHATSAPP_PHONE_NUMBER_ID="your-phone-number-id"
+export WHATSAPP_VERIFY_TOKEN="your-verify-token"
+export WHATSAPP_APP_SECRET="your-app-secret"  # For signature validation
+```
+
+### Basic Usage
+
+```python
+from upsonic import Agent
+from upsonic.interfaces import WhatsAppInterface, InterfaceManager
+
+agent = Agent("openai/gpt-4o")
+
+whatsapp = WhatsAppInterface(
+    agent=agent,
+    verify_token="your-verify-token",
+    app_secret="your-app-secret",
+    mode="chat"
+)
+
+manager = InterfaceManager(interfaces=[whatsapp])
+manager.serve(port=8000)
+```
+
+### Advanced Configuration
+
+```python
+whatsapp = WhatsAppInterface(
+    agent=agent,
+    verify_token="verify-token",
+    app_secret="app-secret",
+    mode="chat",
+    allowed_numbers=["+905551234567", "+905559876543"],  # Whitelist
+    heartbeat_recipient="+905551234567"  # For autonomous agents
+)
+```
+
+### Media Support
+
+- **Images** - JPG, PNG, GIF, WebP
+- **Documents** - PDF, Office documents
+- **Audio** - Voice messages, audio files
+- **Video** - Video messages
+
+```python
+# Agent processes media automatically
+# Supports image generation in responses
+```
+
+### Webhook Setup
+
+1. **Configure webhook URL:**
+   - WhatsApp Settings → Configuration
+   - Callback URL: `https://your-domain.ngrok-free.app/whatsapp/webhook`
+   - Verify token: Your verification token
+   - Subscribe to: `messages`
+
+### Features
+
+- **Webhook verification** - Meta/Facebook validation
+- **Signature validation** - HMAC SHA-256 verification
+- **Media processing** - Images, documents, audio, video
+- **Image generation** - Send generated images
+- **Typing indicators** - Read receipts
+- **Whitelist control** - Phone number restrictions
+
+---
+
+## Multi-Interface Setup
+
+Run multiple interfaces simultaneously:
+
+```python
+from upsonic import Agent
+from upsonic.interfaces import (
+    InterfaceManager,
+    SlackInterface,
+    TelegramInterface,
+    GmailInterface
+)
+from upsonic.storage import RedisStorage
+
+# Shared storage for all interfaces
+storage = RedisStorage(url="redis://localhost:6379")
+
+# Create agent
+agent = Agent("anthropic/claude-sonnet-4-5")
+
+# Create interfaces
+slack = SlackInterface(agent=agent, mode="chat", storage=storage)
+telegram = TelegramInterface(agent=agent, mode="chat", storage=storage)
+gmail = GmailInterface(agent=agent, mode="task", storage=storage)
+
+# Combine in manager
+manager = InterfaceManager(interfaces=[slack, telegram, gmail])
+manager.serve(port=8000)
+```
+
+**Endpoints:**
+- `/slack/events` - Slack webhook
+- `/telegram/webhook` - Telegram webhook
+- `/gmail/check` - Gmail processor
+- `/health` - Health check
+
+## Access Control
+
+### Whitelist by User/Email/Number
+
+```python
+# Slack - by user ID
+slack = SlackInterface(
+    agent=agent,
+    allowed_user_ids=["U01ABC123", "U02DEF456"]
+)
+
+# Gmail - by email address
+gmail = GmailInterface(
+    agent=agent,
+    allowed_emails=["user@example.com", "admin@company.com"]
+)
+
+# Telegram - by user ID
+telegram = TelegramInterface(
+    agent=agent,
+    allowed_user_ids=[123456789, 987654321]
+)
+
+# WhatsApp - by phone number
+whatsapp = WhatsAppInterface(
+    agent=agent,
+    allowed_numbers=["+905551234567", "+905559876543"]
+)
+```
+
+Unauthorized users are **silently ignored** (logged only).
+
+## Security Best Practices
+
+1. **Use environment variables:**
+```bash
+# Never hardcode tokens
+export SLACK_BOT_TOKEN="..."
+export TELEGRAM_BOT_TOKEN="..."
+```
+
+2. **Enable signature validation:**
+```python
+slack = SlackInterface(
+    agent=agent,
+    signing_secret=os.getenv("SLACK_SIGNING_SECRET")  # Required
+)
+
+whatsapp = WhatsAppInterface(
+    agent=agent,
+    app_secret=os.getenv("WHATSAPP_APP_SECRET")  # Recommended
+)
+```
+
+3. **Use HTTPS in production:**
+```python
+telegram = TelegramInterface(
+    agent=agent,
+    webhook_url="https://your-domain.com",  # HTTPS required
+    webhook_secret="random-secret-token"
+)
+```
+
+4. **Implement whitelists:**
+```python
+# Restrict access to specific users
+interface = SlackInterface(
+    agent=agent,
+    allowed_user_ids=["U01ABC123"]
+)
+```
+
+## Health Monitoring
+
+All interfaces expose health endpoints:
+
+```bash
+# Check Slack interface
+curl http://localhost:8000/slack/health
+
+# Check Telegram interface
+curl http://localhost:8000/telegram/health
+
+# Check all interfaces
+curl http://localhost:8000/health
+```
+
+**Response example:**
+```json
+{
+  "status": "active",
+  "name": "Slack",
+  "configuration": {
+    "signing_secret_configured": true,
+    "mode": "chat",
+    "active_chat_sessions": 5,
+    "whitelist_enabled": true
+  }
+}
+```
+
+## Troubleshooting
+
+**Webhook not receiving events:**
+- Verify webhook URL is publicly accessible
+- Check signature/token validation
+- Review server logs for errors
+- Test with webhook testers (e.g., webhook.site)
+
+**Permission errors:**
+- Slack: Check bot token scopes
+- Gmail: Re-authenticate with correct scopes
+- Telegram: Verify bot permissions
+- WhatsApp: Check Business API access
+
+**Chat sessions not persisting:**
+- Ensure storage backend is configured
+- Verify storage connection
+- Check storage credentials
+
+**Media not processing:**
+- Verify agent model supports media types
+- Check file size limits
+- Review download permissions
+
+## Next Steps
+
+- Learn about [CLI deployment](/deployment/cli)
+- Deploy with [AgentOS](/deployment/agentos)
+- Configure [storage backends](/guides/storage)
+- Implement [safety policies](/concepts/safety-engine)

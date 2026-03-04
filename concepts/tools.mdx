@@ -1,0 +1,496 @@
+---
+title: "Tools"
+description: "Tool system with MCP integration, built-in tools, and custom tool creation"
+---
+
+## Overview
+
+The Upsonic tool system provides a comprehensive framework for extending agent capabilities with custom functions, external integrations, and Model Context Protocol (MCP) servers. Tools enable agents to interact with APIs, databases, file systems, and any external service.
+
+## Key Features
+
+- **Simple Function Tools**: Decorate Python functions with `@tool`
+- **MCP Integration**: Connect to hundreds of MCP servers
+- **ToolKits**: Organize related tools into collections
+- **Built-in Tools**: Pre-configured tools for common tasks
+- **Agent-as-Tool**: Use other agents as tools for delegation
+- **Async Support**: Full support for async tools
+- **Schema Generation**: Automatic JSON schema from type hints
+- **Error Handling**: Robust error management with retries
+
+## Creating Tools
+
+### Function Tools
+
+The simplest way to create a tool is with the `@tool` decorator:
+
+```python
+from upsonic.tools import tool
+
+@tool
+def calculate(expression: str) -> float:
+    """Evaluate a mathematical expression.
+    
+    Args:
+        expression: Mathematical expression to evaluate
+        
+    Returns:
+        Result of the calculation
+    """
+    return eval(expression)
+
+# Use with agent
+agent = Agent(
+    model="openai/gpt-4o",
+    tools=[calculate]
+)
+```
+
+### Async Tools
+
+```python
+import httpx
+
+@tool
+async def fetch_url(url: str) -> str:
+    """Fetch content from a URL."""
+    async with httpx.AsyncClient() as client:
+        response = await client.get(url)
+        return response.text
+
+agent = Agent(
+    model="openai/gpt-4o",
+    tools=[fetch_url]
+)
+```
+
+### Tools with Complex Parameters
+
+```python
+from typing import List, Dict, Optional
+
+@tool
+def search_database(
+    query: str,
+    filters: Optional[Dict[str, str]] = None,
+    limit: int = 10
+) -> List[Dict[str, str]]:
+    """Search the database with filters.
+    
+    Args:
+        query: Search query string
+        filters: Optional filters (e.g., {"category": "tech"})
+        limit: Maximum number of results
+        
+    Returns:
+        List of matching records
+    """
+    # Implementation here
+    return [{"id": "1", "title": "Result"}]
+```
+
+## ToolKits
+
+### Creating a ToolKit
+
+Organize related tools into a ToolKit:
+
+```python
+from upsonic.tools import ToolKit, tool
+
+class DatabaseToolKit(ToolKit):
+    """Tools for database operations."""
+    
+    @tool
+    def query(self, sql: str) -> List[Dict]:
+        """Execute a SQL query."""
+        # Implementation
+        return []
+    
+    @tool
+    def insert(self, table: str, data: Dict) -> str:
+        """Insert data into a table."""
+        # Implementation
+        return "success"
+    
+    @tool
+    def delete(self, table: str, id: str) -> bool:
+        """Delete a record by ID."""
+        # Implementation
+        return True
+
+# Use with agent
+db_tools = DatabaseToolKit()
+agent = Agent(
+    model="openai/gpt-4o",
+    tools=[db_tools]
+)
+```
+
+### ToolKit with Shared State
+
+```python
+class WeatherToolKit(ToolKit):
+    """Weather information tools."""
+    
+    def __init__(self, api_key: str):
+        self.api_key = api_key
+        self.cache = {}
+    
+    @tool
+    def get_current_weather(self, city: str) -> Dict:
+        """Get current weather for a city."""
+        # Use self.api_key and self.cache
+        return {"city": city, "temp": 72, "condition": "sunny"}
+    
+    @tool
+    def get_forecast(self, city: str, days: int = 5) -> List[Dict]:
+        """Get weather forecast."""
+        return [{"day": i, "temp": 70} for i in range(days)]
+
+weather = WeatherToolKit(api_key="your-key")
+agent = Agent(model="openai/gpt-4o", tools=[weather])
+```
+
+## MCP Integration
+
+### Connecting to MCP Servers
+
+```python
+from upsonic import Agent
+from upsonic.tools import MCPHandler
+
+# Connect to SQLite MCP server
+mcp = MCPHandler(
+    command="uvx mcp-server-sqlite --db-path ~/data.db"
+)
+
+agent = Agent(
+    model="openai/gpt-4o",
+    tools=[mcp]
+)
+```
+
+### MCP with Custom Configuration
+
+```python
+# SSE transport
+mcp_sse = MCPHandler(
+    url="http://localhost:8000/sse",
+    transport="sse"
+)
+
+# With environment variables
+mcp_with_env = MCPHandler(
+    command="npx @modelcontextprotocol/server-filesystem /path/to/files",
+    env={"DEBUG": "true"}
+)
+
+# With tool filtering
+mcp_filtered = MCPHandler(
+    command="uvx mcp-server-git",
+    include_tools=["git_status", "git_diff"],  # Only these tools
+    exclude_tools=["git_push"]  # Exclude this tool
+)
+```
+
+### Tool Name Prefixing
+
+Avoid name collisions when using multiple MCP servers:
+
+```python
+# Add prefix to avoid collisions
+mcp1 = MCPHandler(
+    command="uvx mcp-server-sqlite --db-path ~/db1.db",
+    tool_name_prefix="db1"  # Tools: db1_query, db1_execute
+)
+
+mcp2 = MCPHandler(
+    command="uvx mcp-server-sqlite --db-path ~/db2.db",
+    tool_name_prefix="db2"  # Tools: db2_query, db2_execute
+)
+
+agent = Agent(model="openai/gpt-4o", tools=[mcp1, mcp2])
+```
+
+### Multiple MCP Servers
+
+```python
+from upsonic.tools import MultiMCPHandler
+
+# Connect to multiple servers at once
+multi_mcp = MultiMCPHandler(
+    commands=[
+        "uvx mcp-server-sqlite --db-path ~/data.db",
+        "uvx mcp-server-git",
+        "npx @modelcontextprotocol/server-filesystem /docs"
+    ],
+    tool_name_prefixes=["db", "git", "fs"]
+)
+
+agent = Agent(model="openai/gpt-4o", tools=[multi_mcp])
+
+# Get server info
+info = multi_mcp.get_server_info()
+for server in info:
+    print(f"{server['server_name']}: {len(server['tools'])} tools")
+```
+
+## Tool Configuration
+
+### Tool-Specific Config
+
+```python
+from upsonic.tools import tool, ToolConfig
+
+@tool(config=ToolConfig(
+    timeout=30,
+    max_retries=3,
+    sequential=True  # Must run sequentially
+))
+def critical_operation(data: str) -> str:
+    """Perform a critical operation."""
+    return f"Processed: {data}"
+```
+
+### Retry Behavior
+
+```python
+@tool(config=ToolConfig(
+    timeout=60,
+    max_retries=5,
+    retry_on_failure=True
+))
+async def fetch_data(endpoint: str) -> Dict:
+    """Fetch data with automatic retries."""
+    # Network call with auto-retry
+    pass
+```
+
+## Agents as Tools
+
+### Using Agents as Tools
+
+Agents can be tools for other agents:
+
+```python
+# Specialized agents
+researcher = Agent(
+    model="openai/gpt-4o",
+    name="Researcher",
+    role="Research specialist",
+    instructions="Find and analyze information"
+)
+
+writer = Agent(
+    model="anthropic/claude-3-sonnet",
+    name="Writer",
+    role="Content writer",
+    instructions="Create clear, engaging content"
+)
+
+# Coordinator agent with sub-agents as tools
+coordinator = Agent(
+    model="openai/gpt-4o",
+    name="Coordinator",
+    tools=[researcher, writer]
+)
+
+# Coordinator can delegate to specialized agents
+result = coordinator.do(Task(
+    "Research AI trends and write a blog post"
+))
+```
+
+## Tool Metadata and Introspection
+
+### Accessing Tool Definitions
+
+```python
+# Get tool definitions from agent
+tool_defs = agent.tool_manager.get_tool_definitions()
+
+for tool_def in tool_defs:
+    print(tool_def.name)
+    print(tool_def.description)
+    print(tool_def.parameters_json_schema)
+```
+
+### Tool Metrics
+
+```python
+from upsonic.tools import Tool
+
+class CustomTool(Tool):
+    def __init__(self):
+        super().__init__(
+            name="custom_tool",
+            description="A custom tool"
+        )
+    
+    async def execute(self, **kwargs):
+        # Tool logic
+        return "result"
+
+tool = CustomTool()
+
+# Access metrics
+print(tool.metrics.tool_count)
+print(tool.metrics.total_duration)
+```
+
+## Built-in Tools
+
+### Output Tool
+
+The output tool allows agents to return structured results:
+
+```python
+from upsonic.tools.builtin_tools import OutputTool
+
+# Automatically available to agents
+agent = Agent("openai/gpt-4o")
+
+# Agent can use output() to return results
+result = agent.do(Task(
+    "Calculate 2+2 and return the result using output()"
+))
+```
+
+### Thinking Tools
+
+Enable planning and execution:
+
+```python
+agent = Agent(
+    model="openai/gpt-4o",
+    enable_thinking_tool=True  # Adds plan_and_execute
+)
+
+# Agent can break down complex tasks
+result = agent.do(Task(
+    "Research quantum computing, write a summary, "
+    "and create a presentation"
+))
+```
+
+## Tool Safety Policies
+
+### Pre-Execution Validation
+
+```python
+from upsonic.safety_engine import HarmfulToolBlockPolicy
+
+agent = Agent(
+    model="openai/gpt-4o",
+    tools=[database_tool, file_tool],
+    tool_policy_pre=HarmfulToolBlockPolicy()  # Validate before execution
+)
+```
+
+### Post-Execution Validation
+
+```python
+agent = Agent(
+    model="openai/gpt-4o",
+    tools=[api_tool],
+    tool_policy_post=ContentFilterPolicy()  # Filter tool results
+)
+```
+
+## Dynamic Tool Management
+
+### Adding Tools at Runtime
+
+```python
+agent = Agent("openai/gpt-4o")
+
+# Add tools dynamically
+agent.add_tools([new_tool, another_tool])
+
+# Add to task
+task = Task("Use the new tool")
+task.add_tools([task_specific_tool])
+```
+
+### Removing Tools
+
+```python
+# Remove by name
+agent.remove_tools(["tool_name"])
+
+# Remove by object
+agent.remove_tools([tool_object])
+
+# Remove from task
+task.remove_tools(["task_tool"])
+```
+
+## Complete Example
+
+```python
+from upsonic import Agent, Task
+from upsonic.tools import tool, ToolKit, MCPHandler
+import httpx
+
+# Custom function tool
+@tool
+async def search_web(query: str) -> str:
+    """Search the web for information."""
+    async with httpx.AsyncClient() as client:
+        response = await client.get(
+            f"https://api.search.com/search?q={query}"
+        )
+        return response.text
+
+# ToolKit
+class DataToolKit(ToolKit):
+    @tool
+    def analyze(self, data: List[float]) -> Dict:
+        """Analyze data and return statistics."""
+        return {
+            "mean": sum(data) / len(data),
+            "count": len(data)
+        }
+    
+    @tool
+    def export(self, data: List, format: str = "json") -> str:
+        """Export data in specified format."""
+        import json
+        return json.dumps(data)
+
+# MCP integration
+mcp = MCPHandler(
+    command="uvx mcp-server-sqlite --db-path ~/data.db",
+    tool_name_prefix="db"
+)
+
+# Create agent with all tools
+agent = Agent(
+    model="openai/gpt-4o",
+    name="DataAnalyst",
+    tools=[
+        search_web,
+        DataToolKit(),
+        mcp
+    ],
+    enable_thinking_tool=True
+)
+
+# Execute complex task
+task = Task(
+    "Search for data analysis best practices, "
+    "analyze the sales data from the database, "
+    "and export the results"
+)
+
+result = agent.do(task)
+print(result)
+```
+
+## See Also
+
+- [Agent](/concepts/agent) - Using tools with agents
+- [Task](/concepts/task) - Task-level tools
+- [MCP Integration](/integrations/mcp) - Detailed MCP guide
+- [Safety Engine](/concepts/safety-engine) - Tool safety policies

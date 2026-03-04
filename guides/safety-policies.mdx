@@ -1,0 +1,606 @@
+---
+title: Safety Policies
+description: Implementing safety policies, custom policies, and content filtering
+---
+
+# Safety Policies
+
+Learn how to implement safety guardrails and content filtering using Upsonic's policy system. Protect your agents from harmful inputs and outputs with customizable safety rules.
+
+## Policy System Overview
+
+Upsonic's safety engine provides:
+
+- **Input Validation**: Filter user inputs before processing
+- **Output Filtering**: Check agent responses before delivery
+- **Tool Validation**: Approve tools before and after execution
+- **Custom Rules**: Build domain-specific safety policies
+- **Feedback Loops**: Automatically retry with helpful messages
+
+Reference: `src/upsonic/safety_engine/base/policy.py:12-96`
+
+## Policy Architecture
+
+A policy combines two components:
+
+1. **Rule**: Detects policy violations
+2. **Action**: Determines what to do when violated
+
+```python
+from upsonic.safety_engine.base import Policy, RuleBase, ActionBase
+
+policy = Policy(
+    name="ProfanityFilter",
+    description="Block profanity in user inputs",
+    rule=profanity_detection_rule,
+    action=block_action
+)
+```
+
+## Using Policies
+
+<Steps>
+  <Step title="Create or Import Policy">
+    Use built-in policies or create custom ones:
+
+    ```python
+    from upsonic.safety_engine import (
+        ProfanityPolicy,
+        PIIPolicy,
+        AdultContentPolicy
+    )
+
+    # Built-in policies
+    profanity_policy = ProfanityPolicy()
+    pii_policy = PIIPolicy()
+    adult_content_policy = AdultContentPolicy()
+    ```
+  </Step>
+
+  <Step title="Attach to Agent">
+    Apply policies at different stages:
+
+    ```python
+    from upsonic import Agent
+
+    agent = Agent(
+        model="openai/gpt-4o",
+        # User input policies
+        user_policy=[profanity_policy, pii_policy],
+        
+        # Agent output policies
+        agent_policy=[adult_content_policy],
+        
+        # Tool execution policies
+        tool_policy_pre=[tool_approval_policy],
+        tool_policy_post=[tool_validation_policy]
+    )
+    ```
+  </Step>
+
+  <Step title="Handle Policy Violations">
+    Configure how violations are handled:
+
+    ```python
+    agent = Agent(
+        model="openai/gpt-4o",
+        user_policy=profanity_policy,
+        
+        # Feedback mode: Returns helpful message instead of blocking
+        user_policy_feedback=True,
+        user_policy_feedback_loop=3,  # Max 3 retries
+        
+        # Agent policy feedback
+        agent_policy_feedback=True,
+        agent_policy_feedback_loop=2
+    )
+    ```
+
+    Reference: `src/upsonic/agent/agent.py:206-210`
+  </Step>
+</Steps>
+
+## Policy Types
+
+### User Input Policies
+
+Validate user inputs before processing:
+
+```python
+from upsonic.safety_engine import (
+    ProfanityPolicy,
+    PIIPolicy,
+    PhishingPolicy
+)
+
+agent = Agent(
+    model="openai/gpt-4o",
+    user_policy=[
+        ProfanityPolicy(),  # Block offensive language
+        PIIPolicy(),        # Detect personal information
+        PhishingPolicy()    # Identify phishing attempts
+    ]
+)
+
+# Blocked input
+result = agent.do(Task("Here is my SSN: 123-45-6789"))
+# Raises DisallowedOperation or returns feedback message
+```
+
+### Agent Output Policies
+
+Filter agent responses:
+
+```python
+from upsonic.safety_engine import (
+    AdultContentPolicy,
+    MedicalAdvicePolicy,
+    LegalAdvicePolicy
+)
+
+agent = Agent(
+    model="openai/gpt-4o",
+    agent_policy=[
+        AdultContentPolicy(),    # Filter inappropriate content
+        MedicalAdvicePolicy(),   # Prevent medical advice
+        LegalAdvicePolicy()      # Prevent legal advice
+    ],
+    agent_policy_feedback=True  # Retry with feedback
+)
+```
+
+Reference: `src/upsonic/agent/policy_manager.py`
+
+### Tool Policies
+
+Control tool usage:
+
+```python
+from upsonic.safety_engine import (
+    TechnicalOperationsPolicy,
+    CybersecurityPolicy
+)
+
+agent = Agent(
+    model="openai/gpt-4o",
+    tools=[file_system_tools, network_tools],
+    
+    # Pre-execution: Check tool calls before running
+    tool_policy_pre=[
+        TechnicalOperationsPolicy(),
+        CybersecurityPolicy()
+    ],
+    
+    # Post-execution: Validate tool results
+    tool_policy_post=[
+        OutputValidationPolicy()
+    ]
+)
+```
+
+## Creating Custom Policies
+
+### Custom Rule
+
+Implement custom detection logic:
+
+```python
+from upsonic.safety_engine.base import RuleBase
+from upsonic.safety_engine.models import PolicyInput, RuleOutput
+
+class CustomKeywordRule(RuleBase):
+    """Block messages containing specific keywords."""
+    
+    def __init__(self, blocked_keywords: list[str]):
+        super().__init__(
+            name="CustomKeywordFilter",
+            description="Filter specific keywords"
+        )
+        self.blocked_keywords = [k.lower() for k in blocked_keywords]
+    
+    def process(self, policy_input: PolicyInput) -> RuleOutput:
+        """Check if input contains blocked keywords."""
+        texts = policy_input.input_texts or []
+        
+        for text in texts:
+            text_lower = text.lower()
+            for keyword in self.blocked_keywords:
+                if keyword in text_lower:
+                    return RuleOutput(
+                        is_violated=True,
+                        violation_details={
+                            "keyword": keyword,
+                            "message": f"Blocked keyword detected: {keyword}"
+                        },
+                        severity="high"
+                    )
+        
+        return RuleOutput(
+            is_violated=False,
+            violation_details={},
+            severity="none"
+        )
+```
+
+### Custom Action
+
+Define what happens on violation:
+
+```python
+from upsonic.safety_engine.base import ActionBase
+from upsonic.safety_engine.models import ActionOutput, RuleOutput
+
+class CustomBlockAction(ActionBase):
+    """Block operation and log violation."""
+    
+    def __init__(self, log_file: str = "violations.log"):
+        super().__init__(
+            name="CustomBlockAction",
+            description="Block and log violations"
+        )
+        self.log_file = log_file
+    
+    def execute_action(
+        self,
+        rule_result: RuleOutput,
+        input_texts: list[str],
+        language: str,
+        *args
+    ) -> ActionOutput:
+        """Log violation and block."""
+        if rule_result.is_violated:
+            # Log to file
+            with open(self.log_file, "a") as f:
+                f.write(f"Violation: {rule_result.violation_details}\n")
+            
+            return ActionOutput(
+                action_taken="blocked",
+                modified_output="Request blocked due to policy violation.",
+                metadata={"logged": True}
+            )
+        
+        return ActionOutput(
+            action_taken="allowed",
+            modified_output=None,
+            metadata={}
+        )
+```
+
+### Combine into Policy
+
+```python
+from upsonic.safety_engine.base import Policy
+
+custom_rule = CustomKeywordRule(
+    blocked_keywords=["confidential", "internal", "secret"]
+)
+
+custom_action = CustomBlockAction(
+    log_file="security_violations.log"
+)
+
+custom_policy = Policy(
+    name="InformationLeakagePolicy",
+    description="Prevent leaking confidential information",
+    rule=custom_rule,
+    action=custom_action
+)
+
+# Use with agent
+agent = Agent(
+    model="openai/gpt-4o",
+    agent_policy=[custom_policy]
+)
+```
+
+## Policy Feedback Loops
+
+Instead of blocking, provide helpful feedback:
+
+```python
+agent = Agent(
+    model="openai/gpt-4o",
+    user_policy=pii_policy,
+    user_policy_feedback=True,  # Enable feedback mode
+    user_policy_feedback_loop=3  # Max 3 retry attempts
+)
+
+# User input: "My email is john@example.com"
+# Instead of blocking:
+# 1. Agent detects PII violation
+# 2. Returns: "Please don't include personal information like email addresses"
+# 3. User can rephrase: "I need help with email settings"
+# 4. Agent processes rephrased input
+```
+
+Reference: `src/upsonic/agent/agent.py:413-434`
+
+## Advanced Policy Features
+
+### LLM-Based Rules
+
+Use LLMs for complex detection:
+
+```python
+from upsonic.safety_engine.base import Policy
+
+policy = Policy(
+    name="ContextAwarePolicy",
+    description="Context-aware content filtering",
+    rule=llm_based_rule,
+    action=feedback_action,
+    
+    # Provide LLM for rule processing
+    base_model="openai/gpt-4o-mini",
+    language="en"
+)
+```
+
+### Multi-Language Support
+
+```python
+policy = Policy(
+    name="MultilingualProfanityFilter",
+    description="Profanity filter for multiple languages",
+    rule=profanity_rule,
+    action=block_action,
+    language="auto",  # Auto-detect language
+    language_identify_model="openai/gpt-4o-mini"
+)
+```
+
+### Severity Levels
+
+```python
+class SeverityAwareAction(ActionBase):
+    """Take different actions based on severity."""
+    
+    def execute_action(self, rule_result, input_texts, *args):
+        if not rule_result.is_violated:
+            return ActionOutput(action_taken="allowed")
+        
+        severity = rule_result.severity
+        
+        if severity == "critical":
+            # Block and alert
+            send_security_alert(rule_result)
+            return ActionOutput(
+                action_taken="blocked",
+                modified_output="Request blocked due to critical policy violation."
+            )
+        
+        elif severity == "high":
+            # Block with warning
+            return ActionOutput(
+                action_taken="blocked",
+                modified_output="Request blocked. Please rephrase."
+            )
+        
+        elif severity == "medium":
+            # Warn but allow
+            return ActionOutput(
+                action_taken="warned",
+                modified_output=f"Warning: {rule_result.violation_details}"
+            )
+        
+        else:
+            # Allow with logging
+            return ActionOutput(action_taken="allowed")
+```
+
+## Built-in Policies
+
+Upsonic provides many pre-built policies:
+
+### Content Safety
+
+```python
+from upsonic.safety_engine import (
+    ProfanityPolicy,
+    AdultContentPolicy,
+    ViolencePolicy
+)
+```
+
+### Privacy Protection
+
+```python
+from upsonic.safety_engine import (
+    PIIPolicy,              # Personal Identifiable Information
+    FinancialDataPolicy,    # Financial data protection
+    HealthDataPolicy        # Health information (HIPAA)
+)
+```
+
+### Professional Boundaries
+
+```python
+from upsonic.safety_engine import (
+    MedicalAdvicePolicy,
+    LegalAdvicePolicy,
+    FinancialAdvicePolicy
+)
+```
+
+### Security
+
+```python
+from upsonic.safety_engine import (
+    PhishingPolicy,
+    MalwarePolicy,
+    CybersecurityPolicy,
+    InsiderThreatPolicy
+)
+```
+
+### Technical Operations
+
+```python
+from upsonic.safety_engine import (
+    TechnicalOperationsPolicy,
+    CodeInjectionPolicy,
+    DataLeakagePolicy
+)
+```
+
+Reference: `src/upsonic/safety_engine/`
+
+## Best Practices
+
+<Tip>
+**Layer Policies**: Use multiple policies for defense in depth:
+
+```python
+agent = Agent(
+    model="openai/gpt-4o",
+    user_policy=[
+        PIIPolicy(),
+        ProfanityPolicy(),
+        PhishingPolicy()
+    ],
+    agent_policy=[
+        AdultContentPolicy(),
+        MedicalAdvicePolicy(),
+        FinancialAdvicePolicy()
+    ]
+)
+```
+</Tip>
+
+<Tip>
+**Feedback Over Blocking**: Enable feedback mode for better UX:
+
+```python
+agent = Agent(
+    model="openai/gpt-4o",
+    user_policy=pii_policy,
+    user_policy_feedback=True,  # User-friendly messages
+    user_policy_feedback_loop=3
+)
+```
+</Tip>
+
+<Warning>
+**Performance Impact**: LLM-based policies add latency. Use lightweight rules when possible:
+
+```python
+# Fast: Regex-based profanity filter
+profanity_policy = ProfanityPolicy()  # Uses pattern matching
+
+# Slower: LLM-based context analysis
+context_policy = ContextualSafetyPolicy()  # Requires LLM call
+```
+</Warning>
+
+<Tip>
+**Test Policies**: Thoroughly test custom policies:
+
+```python
+import pytest
+
+def test_custom_policy():
+    policy = CustomKeywordRule(["secret", "confidential"])
+    
+    # Test violation
+    result = policy.process(PolicyInput(
+        input_texts=["This is a secret document"]
+    ))
+    assert result.is_violated
+    
+    # Test safe input
+    result = policy.process(PolicyInput(
+        input_texts=["This is a public document"]
+    ))
+    assert not result.is_violated
+```
+</Tip>
+
+<Note>
+**Async Support**: Policies support async operations for better performance:
+
+```python
+result = await policy.check_async(policy_input)
+rule_result, action_result, policy_output = await policy.execute_async(policy_input)
+```
+
+Reference: `src/upsonic/safety_engine/base/policy.py:60-90`
+</Note>
+
+## Common Use Cases
+
+### Customer Support Bot
+
+```python
+support_agent = Agent(
+    model="openai/gpt-4o",
+    name="Support Agent",
+    
+    # Protect customer privacy
+    user_policy=[
+        PIIPolicy(),
+        FinancialDataPolicy()
+    ],
+    
+    # Prevent inappropriate responses
+    agent_policy=[
+        ProfanityPolicy(),
+        MedicalAdvicePolicy(),
+        LegalAdvicePolicy()
+    ],
+    
+    # Friendly feedback
+    user_policy_feedback=True,
+    agent_policy_feedback=True
+)
+```
+
+### Enterprise Assistant
+
+```python
+enterprise_agent = Agent(
+    model="openai/gpt-4o",
+    name="Enterprise Assistant",
+    
+    # Data protection
+    user_policy=[
+        DataLeakagePolicy(),
+        InsiderThreatPolicy()
+    ],
+    
+    # Tool security
+    tool_policy_pre=[
+        TechnicalOperationsPolicy(),
+        CybersecurityPolicy()
+    ],
+    
+    # Strict blocking
+    user_policy_feedback=False  # Block immediately
+)
+```
+
+### Content Moderation
+
+```python
+moderation_agent = Agent(
+    model="openai/gpt-4o",
+    
+    # Comprehensive content filtering
+    agent_policy=[
+        ProfanityPolicy(),
+        AdultContentPolicy(),
+        ViolencePolicy(),
+        HateSpeechPolicy()
+    ],
+    
+    # Multiple retry attempts
+    agent_policy_feedback=True,
+    agent_policy_feedback_loop=5
+)
+```
+
+## Next Steps
+
+- [Building Agents](/guides/building-agents) - Apply policies to agents
+- [Custom Tools](/guides/custom-tools) - Add tool safety policies
+- [Multi-Agent Workflows](/guides/multi-agent-workflows) - Team-wide policies
+- [Memory Management](/guides/memory-management) - Privacy in stored data

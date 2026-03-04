@@ -1,0 +1,510 @@
+---
+title: "Memory"
+description: "Memory management with session persistence, summaries, and user profiles"
+---
+
+## Overview
+
+The `Memory` class orchestrates session and user memory for AI agents. It provides conversation history, automatic summarization, user profile extraction, and persistence across sessions. Memory enables agents to maintain context and personalization across multiple interactions.
+
+## Key Features
+
+- **Session Memory**: Chat history with automatic persistence
+- **Session Summaries**: Automatic conversation summarization
+- **User Profiles**: Extract and maintain user information
+- **Dynamic Schemas**: Auto-generate profile schemas from conversations
+- **Multiple Storage Backends**: In-memory, JSON, SQLite, Redis, PostgreSQL, MongoDB
+- **Runtime Session Type Selection**: Same Memory instance for Agent, Team, and Workflow
+- **Message Limits**: Configurable history truncation
+- **Tool Call History**: Optional inclusion of tool calls in memory
+
+## Basic Usage
+
+### Simple Memory Setup
+
+```python
+from upsonic import Agent, Task
+from upsonic.storage import InMemoryStorage, Memory
+
+# Create storage backend
+storage = InMemoryStorage()
+
+# Create memory
+memory = Memory(
+    storage=storage,
+    full_session_memory=True
+)
+
+# Attach to agent
+agent = Agent(
+    model="openai/gpt-4o",
+    memory=memory
+)
+
+# Multi-turn conversation
+agent.do(Task("My name is Alice"))
+agent.do(Task("I live in Paris"))
+agent.do(Task("What's my name and where do I live?"))
+# Output: "Your name is Alice and you live in Paris."
+```
+
+### Memory with Summaries
+
+```python
+memory = Memory(
+    storage=storage,
+    full_session_memory=True,
+    summary_memory=True,  # Enable summaries
+    model="openai/gpt-4o"  # Model for summarization
+)
+
+agent = Agent(model="openai/gpt-4o", memory=memory)
+
+# After many turns, older messages are summarized
+# to save context window space
+```
+
+## Initialization
+
+### Constructor Parameters
+
+```python
+Memory(
+    storage: Storage,
+    session_id: Optional[str] = None,  # Auto-generated if None
+    user_id: Optional[str] = None,     # Auto-generated if None
+    
+    # Session Memory
+    full_session_memory: bool = False,
+    summary_memory: bool = False,
+    num_last_messages: Optional[int] = None,
+    feed_tool_call_results: bool = False,
+    
+    # User Memory
+    user_analysis_memory: bool = False,
+    user_profile_schema: Optional[Type[BaseModel]] = None,
+    dynamic_user_profile: bool = False,
+    user_memory_mode: Literal['update', 'replace'] = 'update',
+    
+    # Model for summaries/profiles
+    model: Optional[Union[Model, str]] = None,
+    
+    # Debug
+    debug: bool = False,
+    debug_level: int = 1,
+)
+```
+
+### Key Parameters
+
+<ParamField path="storage" type="Storage" required>
+  Storage backend for persistence (InMemoryStorage, JSONStorage, SQLiteStorage, etc.)
+</ParamField>
+
+<ParamField path="full_session_memory" type="bool" default="false">
+  Enable chat history persistence
+</ParamField>
+
+<ParamField path="summary_memory" type="bool" default="false">
+  Enable automatic session summarization
+</ParamField>
+
+<ParamField path="user_analysis_memory" type="bool" default="false">
+  Enable user profile extraction and maintenance
+</ParamField>
+
+<ParamField path="num_last_messages" type="int">
+  Maximum message turns to keep in history (older messages are dropped)
+</ParamField>
+
+<ParamField path="model" type="Model | str">
+  Model for generating summaries and user profiles (required if summary_memory or user_analysis_memory is enabled)
+</ParamField>
+
+## Storage Backends
+
+### In-Memory Storage
+
+For development and testing:
+
+```python
+from upsonic.storage import InMemoryStorage, Memory
+
+storage = InMemoryStorage()
+memory = Memory(
+    storage=storage,
+    full_session_memory=True
+)
+```
+
+### JSON File Storage
+
+Persist to JSON files:
+
+```python
+from upsonic.storage import JSONStorage, Memory
+
+storage = JSONStorage(
+    base_path="./storage",
+    session_file="sessions.json",
+    user_file="users.json"
+)
+
+memory = Memory(
+    storage=storage,
+    full_session_memory=True
+)
+```
+
+### SQLite Storage
+
+Persist to SQLite database:
+
+```python
+from upsonic.storage import SQLiteStorage, Memory
+
+storage = SQLiteStorage(
+    db_path="./data/memory.db"
+)
+
+memory = Memory(
+    storage=storage,
+    full_session_memory=True
+)
+```
+
+### Redis Storage
+
+For distributed systems:
+
+```python
+from upsonic.storage import RedisStorage, Memory
+
+storage = RedisStorage(
+    host="localhost",
+    port=6379,
+    db=0
+)
+
+memory = Memory(
+    storage=storage,
+    full_session_memory=True
+)
+```
+
+### PostgreSQL Storage
+
+Production-grade persistence:
+
+```python
+from upsonic.storage import PostgreSQLStorage, Memory
+
+storage = PostgreSQLStorage(
+    connection_string="postgresql://user:pass@localhost/db"
+)
+
+memory = Memory(
+    storage=storage,
+    full_session_memory=True
+)
+```
+
+## Session Memory
+
+### Message History
+
+Automatic conversation tracking:
+
+```python
+memory = Memory(
+    storage=storage,
+    full_session_memory=True,
+    feed_tool_call_results=True  # Include tool calls
+)
+
+agent = Agent(model="openai/gpt-4o", memory=memory)
+
+# Conversation is automatically stored
+agent.do(Task("What is Python?"))
+agent.do(Task("Show me an example"))
+agent.do(Task("Explain the code"))
+```
+
+### Message Limits
+
+Control memory usage:
+
+```python
+memory = Memory(
+    storage=storage,
+    full_session_memory=True,
+    num_last_messages=10  # Keep only last 10 message turns
+)
+```
+
+### Session Summaries
+
+Automatic summarization:
+
+```python
+memory = Memory(
+    storage=storage,
+    full_session_memory=True,
+    summary_memory=True,
+    model="openai/gpt-4o"  # Model for summarization
+)
+
+agent = Agent(model="openai/gpt-4o", memory=memory)
+
+# Long conversation
+for i in range(20):
+    agent.do(Task(f"Question {i}"))
+
+# Older messages are automatically summarized
+# Summary is injected as context for future turns
+```
+
+## User Memory
+
+### User Profile Extraction
+
+Automatic user information extraction:
+
+```python
+from pydantic import BaseModel
+
+class UserProfile(BaseModel):
+    name: str
+    age: int
+    interests: list[str]
+    location: str
+
+memory = Memory(
+    storage=storage,
+    user_analysis_memory=True,
+    user_profile_schema=UserProfile,
+    model="openai/gpt-4o"
+)
+
+agent = Agent(model="openai/gpt-4o", memory=memory)
+
+# User provides information
+agent.do(Task("My name is Bob, I'm 30 years old"))
+agent.do(Task("I love hiking and photography"))
+agent.do(Task("I live in Seattle"))
+
+# Profile is automatically extracted and maintained
+# Future conversations are personalized
+```
+
+### Dynamic User Profiles
+
+Auto-generate schema from conversations:
+
+```python
+memory = Memory(
+    storage=storage,
+    user_analysis_memory=True,
+    dynamic_user_profile=True,  # No predefined schema
+    model="openai/gpt-4o"
+)
+
+# Schema is generated based on conversation content
+```
+
+### Update vs Replace Mode
+
+```python
+# Update mode (default): Merge new information
+memory = Memory(
+    storage=storage,
+    user_analysis_memory=True,
+    user_memory_mode='update',  # Incremental updates
+    model="openai/gpt-4o"
+)
+
+# Replace mode: Overwrite profile each time
+memory = Memory(
+    storage=storage,
+    user_analysis_memory=True,
+    user_memory_mode='replace',  # Full replacement
+    model="openai/gpt-4o"
+)
+```
+
+## Session Management
+
+### Explicit Session IDs
+
+```python
+memory = Memory(
+    storage=storage,
+    session_id="session_001",
+    user_id="user_123",
+    full_session_memory=True
+)
+```
+
+### Auto-Generated IDs
+
+```python
+memory = Memory(
+    storage=storage,
+    full_session_memory=True
+    # session_id and user_id auto-generated
+)
+
+print(memory.session_id)  # UUID string
+print(memory.user_id)     # UUID string
+```
+
+### Shared Memory Across Agents
+
+```python
+# Same memory for multiple agents
+memory = Memory(
+    storage=storage,
+    full_session_memory=True
+)
+
+agent1 = Agent(model="openai/gpt-4o", memory=memory)
+agent2 = Agent(model="anthropic/claude-3-sonnet", memory=memory)
+
+# Both agents share conversation history
+agent1.do(Task("My favorite color is blue"))
+agent2.do(Task("What's my favorite color?"))
+# Output: "Your favorite color is blue."
+```
+
+## Advanced Features
+
+### Runtime Session Type Selection
+
+The same Memory instance works with Agent, Team, and Workflow:
+
+```python
+from upsonic import Agent, Team
+
+memory = Memory(
+    storage=storage,
+    full_session_memory=True
+)
+
+# Use with Agent
+agent = Agent(model="openai/gpt-4o", memory=memory)
+
+# Use with Team
+team = Team(
+    entities=[agent1, agent2],
+    memory=memory
+)
+
+# Memory automatically adapts to session type
+```
+
+### Memory Introspection
+
+```python
+# Get session memory instance
+session_memory = memory.get_session_memory(SessionType.AGENT)
+
+# Get user memory instance
+user_memory = memory.user_memory
+
+# Check configuration
+print(memory.full_session_memory_enabled)
+print(memory.summary_memory_enabled)
+print(memory.user_analysis_memory_enabled)
+```
+
+### Preparing Memory for Tasks
+
+```python
+import asyncio
+from upsonic.session.base import SessionType
+
+# Prepare memory inputs
+data = asyncio.run(
+    memory.prepare_inputs_for_task(
+        session_type=SessionType.AGENT,
+        agent_metadata={"version": "1.0"}
+    )
+)
+
+print(data["message_history"])        # List of messages
+print(data["context_injection"])      # Session summary
+print(data["system_prompt_injection"]) # User profile
+print(data["metadata_injection"])     # Metadata
+```
+
+## Complete Example
+
+```python
+from upsonic import Agent, Task
+from upsonic.storage import SQLiteStorage, Memory
+from pydantic import BaseModel
+
+# Define user profile schema
+class UserProfile(BaseModel):
+    name: str
+    age: int
+    occupation: str
+    interests: list[str]
+    preferences: dict[str, str]
+
+# Create storage
+storage = SQLiteStorage(db_path="./data/memory.db")
+
+# Create comprehensive memory
+memory = Memory(
+    storage=storage,
+    session_id="session_001",
+    user_id="user_123",
+    
+    # Session memory
+    full_session_memory=True,
+    summary_memory=True,
+    num_last_messages=20,
+    feed_tool_call_results=True,
+    
+    # User memory
+    user_analysis_memory=True,
+    user_profile_schema=UserProfile,
+    user_memory_mode='update',
+    
+    # Configuration
+    model="openai/gpt-4o",
+    debug=True
+)
+
+# Create agent
+agent = Agent(
+    model="openai/gpt-4o",
+    name="PersonalAssistant",
+    memory=memory
+)
+
+# Conversation with memory
+agent.do(Task("My name is Sarah, I'm 28 years old"))
+agent.do(Task("I work as a software engineer"))
+agent.do(Task("I enjoy hiking, reading, and photography"))
+agent.do(Task("I prefer dark mode in all my apps"))
+
+# Agent remembers and personalizes
+result = agent.do(Task("What do you know about me?"))
+print(result)
+# Output includes: name, age, occupation, interests, preferences
+
+# Long conversation - summaries kick in
+for i in range(30):
+    agent.do(Task(f"Tell me about topic {i}"))
+
+# Session is automatically summarized
+# User profile is continuously updated
+```
+
+## See Also
+
+- [Agent](/concepts/agent) - Using memory with agents
+- [Team](/concepts/team) - Shared memory across teams
+- [Storage Backends](/storage/overview) - Detailed storage documentation

@@ -1,0 +1,221 @@
+---
+title: Storage backends
+description: Configure memory and session storage with Redis, PostgreSQL, MongoDB, and more
+---
+
+## Overview
+
+Upsonic supports multiple storage backends for session memory, user profiles, and agent state. Choose the backend that fits your deployment requirements.
+
+## In-memory storage
+
+Fastest option for development and testing:
+
+```python
+from upsonic import Agent
+from upsonic.storage import Memory, InMemoryStorage
+
+memory = Memory(
+    storage=InMemoryStorage(),
+    session_id="session_001"
+)
+
+agent = Agent(
+    model="anthropic/claude-sonnet-4-5",
+    memory=memory
+)
+```
+
+<Warning>
+Data is lost when the process stops. Only use for development.
+</Warning>
+
+## SQLite storage
+
+File-based persistence for single-server deployments:
+
+```python
+from upsonic.storage import Memory, SQLiteStorage
+
+memory = Memory(
+    storage=SQLiteStorage(database="./agent_memory.db"),
+    session_id="session_001"
+)
+```
+
+**Installation:**
+```bash
+pip install "upsonic[sqlite-storage]"
+```
+
+## Redis storage
+
+High-performance distributed storage:
+
+```python
+from upsonic.storage import Memory, RedisStorage
+
+memory = Memory(
+    storage=RedisStorage(
+        host="localhost",
+        port=6379,
+        db=0,
+        password="your-password"  # Optional
+    ),
+    session_id="session_001"
+)
+```
+
+**Connection string:**
+```python
+memory = Memory(
+    storage=RedisStorage.from_url("redis://localhost:6379/0"),
+    session_id="session_001"
+)
+```
+
+**Installation:**
+```bash
+pip install "upsonic[redis-storage]"
+```
+
+## PostgreSQL storage
+
+Full SQL database with ACID guarantees:
+
+```python
+from upsonic.storage import Memory, PostgresStorage
+
+memory = Memory(
+    storage=PostgresStorage(
+        host="localhost",
+        port=5432,
+        database="upsonic",
+        user="postgres",
+        password="your-password"
+    ),
+    session_id="session_001"
+)
+```
+
+**Connection string:**
+```python
+memory = Memory(
+    storage=PostgresStorage.from_url(
+        "postgresql://user:pass@localhost:5432/upsonic"
+    ),
+    session_id="session_001"
+)
+```
+
+**Installation:**
+```bash
+pip install "upsonic[postgres-storage]"
+```
+
+## MongoDB storage
+
+Document-oriented storage for flexible schemas:
+
+```python
+from upsonic.storage import Memory, MongoStorage
+
+memory = Memory(
+    storage=MongoStorage(
+        host="localhost",
+        port=27017,
+        database="upsonic",
+        username="admin",
+        password="your-password"
+    ),
+    session_id="session_001"
+)
+```
+
+**Connection string:**
+```python
+memory = Memory(
+    storage=MongoStorage.from_url(
+        "mongodb://admin:pass@localhost:27017/upsonic"
+    ),
+    session_id="session_001"
+)
+```
+
+**Installation:**
+```bash
+pip install "upsonic[mongo-storage]"
+```
+
+## JSON file storage
+
+Human-readable file-based storage:
+
+```python
+from upsonic.storage import Memory, JSONStorage
+
+memory = Memory(
+    storage=JSONStorage(directory="./memory_data"),
+    session_id="session_001"
+)
+```
+
+**Installation:**
+```bash
+pip install "upsonic[storage]"
+```
+
+## Choosing a storage backend
+
+| Backend | Use case | Performance | Scalability |
+|---------|----------|-------------|-------------|
+| InMemory | Development | Fastest | Single process |
+| SQLite | Single server | Fast | Single server |
+| JSON | Human-readable | Slow | Single server |
+| Redis | Production | Very fast | Horizontal |
+| PostgreSQL | Enterprise | Fast | Vertical |
+| MongoDB | Flexible schema | Fast | Horizontal |
+
+## Environment-based configuration
+
+Switch backends using environment variables:
+
+```python
+import os
+from upsonic.storage import Memory, RedisStorage, PostgresStorage
+
+def create_storage():
+    storage_type = os.getenv("STORAGE_TYPE", "redis")
+    
+    if storage_type == "redis":
+        return RedisStorage.from_url(os.getenv("REDIS_URL"))
+    elif storage_type == "postgres":
+        return PostgresStorage.from_url(os.getenv("DATABASE_URL"))
+    else:
+        raise ValueError(f"Unknown storage type: {storage_type}")
+
+memory = Memory(
+    storage=create_storage(),
+    session_id="session_001"
+)
+```
+
+## Connection pooling
+
+For production deployments, configure connection pooling:
+
+```python
+from upsonic.storage import PostgresStorage
+
+storage = PostgresStorage(
+    host="localhost",
+    port=5432,
+    database="upsonic",
+    user="postgres",
+    password="your-password",
+    pool_size=20,  # Maximum connections
+    max_overflow=10  # Additional connections when needed
+)
+```
+
+See the [Storage API reference](/api/storage/backends) for complete documentation.

@@ -1,0 +1,453 @@
+---
+title: "Task"
+description: "Task definition with attachments, tools, response formats, and execution tracking"
+---
+
+## Overview
+
+The `Task` class represents a unit of work for an AI agent to execute. It encapsulates the description, attachments, tools, response format, and execution state. Tasks are the primary way to interact with agents in the Upsonic framework.
+
+## Key Features
+
+- **Rich Descriptions**: Natural language task descriptions
+- **File Attachments**: Attach images, PDFs, and documents
+- **Task-Level Tools**: Assign specific tools to individual tasks
+- **Response Formats**: Structured output with Pydantic models
+- **Context Management**: Add context data and RAG results
+- **Execution Tracking**: Monitor task status, duration, and costs
+- **Caching**: Optional response caching for repeated queries
+- **Run Continuity**: Resume paused or failed tasks
+
+## Basic Usage
+
+### Simple Task
+
+```python
+from upsonic import Task, Agent
+
+# Create a task
+task = Task("What is the capital of France?")
+
+# Execute with agent
+agent = Agent("openai/gpt-4o")
+result = agent.do(task)
+print(result)  # "The capital of France is Paris."
+```
+
+### Task with Attachments
+
+```python
+# Attach images or documents
+task = Task(
+    description="Analyze this chart and summarize the trends",
+    attachments=["chart.png", "data.pdf"]
+)
+
+result = agent.do(task)
+```
+
+## Initialization
+
+### Constructor Parameters
+
+```python
+Task(
+    description: str,
+    attachments: Optional[List[str]] = None,
+    tools: list[Any] = None,
+    response_format: Union[Type[BaseModel], type[str], None] = str,
+    response_lang: Optional[str] = "en",
+    context: Any = None,
+    
+    # Advanced options
+    enable_thinking_tool: Optional[bool] = None,
+    enable_reasoning_tool: Optional[bool] = None,
+    guardrail: Optional[Callable] = None,
+    guardrail_retries: Optional[int] = None,
+    
+    # Caching
+    enable_cache: bool = False,
+    cache_method: Literal["vector_search", "llm_call"] = "vector_search",
+    cache_threshold: float = 0.7,
+    
+    # RAG/Vector Search
+    vector_search_top_k: Optional[int] = None,
+    vector_search_alpha: Optional[float] = None,
+    vector_search_filter: Optional[Dict[str, Any]] = None,
+)
+```
+
+### Key Parameters
+
+<ParamField path="description" type="str" required>
+  Natural language description of what the agent should do
+</ParamField>
+
+<ParamField path="attachments" type="List[str]">
+  List of file paths to attach (images, PDFs, documents)
+</ParamField>
+
+<ParamField path="tools" type="list">
+  Task-specific tools (functions, ToolKits, MCP handlers)
+</ParamField>
+
+<ParamField path="response_format" type="Type[BaseModel] | type[str]" default="str">
+  Expected response format - Pydantic model or str
+</ParamField>
+
+<ParamField path="context" type="Any">
+  Additional context data (can include file paths or KnowledgeBase instances)
+</ParamField>
+
+<ParamField path="enable_cache" type="bool" default="false">
+  Enable response caching for this task
+</ParamField>
+
+## Working with Attachments
+
+### Image Attachments
+
+```python
+task = Task(
+    description="Describe what you see in these images",
+    attachments=["photo1.jpg", "photo2.png"]
+)
+```
+
+### Document Attachments
+
+```python
+task = Task(
+    description="Summarize the key points from these documents",
+    attachments=["report.pdf", "notes.docx", "data.csv"]
+)
+```
+
+### Automatic File Detection from Context
+
+Files in context are automatically moved to attachments:
+
+```python
+# Files in context are extracted
+task = Task(
+    description="Analyze the data",
+    context=["data.csv", "report.pdf"]
+)
+
+print(task.attachments)  # ["data.csv", "report.pdf"]
+print(task.context)  # []
+```
+
+## Structured Output
+
+### Pydantic Response Format
+
+```python
+from pydantic import BaseModel
+
+class User(BaseModel):
+    name: str
+    age: int
+    email: str
+
+task = Task(
+    description="Extract user information from the text",
+    response_format=User
+)
+
+result = agent.do(task)
+print(result.name)   # Structured output
+print(result.email)
+```
+
+### Complex Nested Models
+
+```python
+from typing import List
+from pydantic import BaseModel
+
+class Address(BaseModel):
+    street: str
+    city: str
+    zip_code: str
+
+class Person(BaseModel):
+    name: str
+    addresses: List[Address]
+
+task = Task(
+    description="Extract person information",
+    response_format=Person
+)
+
+result = agent.do(task)
+for address in result.addresses:
+    print(address.city)
+```
+
+## Task-Level Tools
+
+### Adding Tools to a Task
+
+```python
+from upsonic.tools import tool
+
+@tool
+def search_database(query: str) -> str:
+    """Search the internal database."""
+    return f"Results for: {query}"
+
+# Task-specific tool
+task = Task(
+    description="Find customer records",
+    tools=[search_database]
+)
+
+result = agent.do(task)
+```
+
+### Dynamically Adding Tools
+
+```python
+task = Task("Analyze the data")
+
+# Add tools after creation
+task.add_tools([search_database, another_tool])
+```
+
+### Removing Tools
+
+```python
+# Remove by name
+task.remove_tools(["search_database"])
+
+# Remove by function object
+task.remove_tools([search_database])
+```
+
+## Context and RAG
+
+### Adding Context
+
+```python
+task = Task(
+    description="Answer questions about our company",
+    context=["We are a tech startup founded in 2020..."]
+)
+```
+
+### KnowledgeBase Context (RAG)
+
+```python
+from upsonic import KnowledgeBase
+
+kb = KnowledgeBase(
+    sources=["docs/", "README.md"],
+    vectordb=chroma_provider,
+    embedding_provider=openai_embedding
+)
+
+task = Task(
+    description="What are the installation steps?",
+    context=[kb]  # RAG will be performed automatically
+)
+
+result = agent.do(task)
+```
+
+### Vector Search Parameters
+
+```python
+task = Task(
+    description="Search for relevant information",
+    context=[kb],
+    vector_search_top_k=5,  # Return top 5 results
+    vector_search_alpha=0.7,  # Hybrid search weight
+    vector_search_filter={"category": "technical"}  # Filter results
+)
+```
+
+## Task Status and Tracking
+
+### Execution Status
+
+```python
+from upsonic.run.base import RunStatus
+
+task = Task("Process the data")
+agent.do(task)
+
+# Check status
+print(task.status)  # RunStatus.completed
+print(task.is_completed)  # True
+print(task.is_problematic)  # False
+
+# Get run ID
+print(task.run_id)  # Unique run identifier
+```
+
+### Duration Tracking
+
+```python
+result = agent.do(task)
+
+print(task.start_time)  # Unix timestamp
+print(task.end_time)    # Unix timestamp
+print(task.duration)    # Duration in seconds
+```
+
+### Cost Tracking
+
+```python
+result = agent.do(task)
+
+# Access cost information
+print(task.total_cost)         # Estimated cost in USD
+print(task.total_input_token)  # Input tokens
+print(task.total_output_token) # Output tokens
+```
+
+## Caching
+
+### Enable Response Caching
+
+```python
+from upsonic.embeddings import OpenAIEmbedding
+
+task = Task(
+    description="What is machine learning?",
+    enable_cache=True,
+    cache_method="vector_search",
+    cache_threshold=0.8,
+    cache_embedding_provider=OpenAIEmbedding()
+)
+
+# First execution - cache miss
+result1 = agent.do(task)
+print(task.cache_hit)  # False
+
+# Second execution - cache hit
+result2 = agent.do(task)
+print(task.cache_hit)  # True
+```
+
+### Cache Statistics
+
+```python
+stats = task.get_cache_stats()
+print(stats["cache_hits"])
+print(stats["cache_misses"])
+print(stats["hit_rate"])
+
+# Clear cache
+task.clear_cache()
+```
+
+## Guardrails
+
+### Custom Validation
+
+```python
+def validate_response(response: str) -> bool:
+    """Validate that response meets requirements."""
+    return len(response) > 100 and "summary" in response.lower()
+
+task = Task(
+    description="Provide a detailed summary",
+    guardrail=validate_response,
+    guardrail_retries=3  # Retry up to 3 times
+)
+
+result = agent.do(task)
+```
+
+## Advanced Features
+
+### Tool Calls Tracking
+
+```python
+result = agent.do(task)
+
+# Access tool call history
+for tool_call in task.tool_calls:
+    print(tool_call["tool_name"])
+    print(tool_call["params"])
+    print(tool_call["tool_result"])
+```
+
+### Canvas Integration
+
+```python
+from upsonic.canvas import Canvas
+
+canvas = Canvas()
+task = Task("Create a visualization")
+task.add_canvas(canvas)
+
+result = agent.do(task)
+```
+
+### Serialization
+
+```python
+# Convert to dictionary
+task_dict = task.to_dict(serialize_flag=True)
+
+# Reconstruct from dictionary
+reconstructed = Task.from_dict(task_dict, deserialize_flag=True)
+```
+
+## Complete Example
+
+```python
+from upsonic import Agent, Task
+from upsonic import KnowledgeBase
+from pydantic import BaseModel
+from typing import List
+
+# Response format
+class Answer(BaseModel):
+    answer: str
+    confidence: float
+    sources: List[str]
+
+# Knowledge base
+kb = KnowledgeBase(
+    sources=["docs/"],
+    vectordb=chroma_provider,
+    embedding_provider=openai_embedding
+)
+
+# Create comprehensive task
+task = Task(
+    description="What are the best practices for error handling?",
+    response_format=Answer,
+    context=[kb],
+    attachments=["guidelines.pdf"],
+    enable_cache=True,
+    cache_threshold=0.9,
+    vector_search_top_k=5
+)
+
+# Execute
+agent = Agent("openai/gpt-4o")
+result = agent.do(task)
+
+# Access structured response
+print(result.answer)
+print(f"Confidence: {result.confidence}")
+for source in result.sources:
+    print(f"- {source}")
+
+# Check execution details
+print(f"Duration: {task.duration}s")
+print(f"Cost: ${task.total_cost}")
+print(f"Cached: {task.cache_hit}")
+```
+
+## See Also
+
+- [Agent](/concepts/agent) - Agent execution
+- [Tools](/concepts/tools) - Task-level tools
+- [Knowledge Base](/concepts/knowledge-base) - RAG integration
+- [Memory](/concepts/memory) - Session management

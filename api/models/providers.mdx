@@ -1,0 +1,281 @@
+---
+title: 'Model Providers'
+description: 'Model provider classes for OpenAI, Anthropic, Azure, Bedrock, Google, and more'
+---
+
+# Model Providers
+
+Upsonic supports multiple AI model providers through a unified interface. Each provider class handles authentication, request formatting, and response processing for its respective API.
+
+## OpenAI Models
+
+### OpenAIChatModel
+
+The primary class for interacting with OpenAI's Chat Completions API.
+
+```python
+from upsonic.models.openai import OpenAIChatModel
+
+model = OpenAIChatModel(
+    model_name='gpt-4o',
+    provider='openai',  # or 'azure', 'deepseek', 'ollama', etc.
+)
+```
+
+**Parameters:**
+- `model_name` (str): OpenAI model name (e.g., 'gpt-4o', 'gpt-4-turbo', 'gpt-3.5-turbo')
+- `provider` (str | Provider): Provider to use - supports 'openai', 'azure', 'deepseek', 'cerebras', 'fireworks', 'github', 'grok', 'ollama', 'openrouter', 'together', 'vercel', 'litellm', 'nvidia', and more
+- `profile` (ModelProfileSpec | None): Model profile for capabilities
+- `settings` (ModelSettings | None): Default settings for requests
+
+**Supported Providers:**
+- OpenAI (official API)
+- Azure OpenAI
+- Ollama (local models)
+- DeepSeek
+- OpenRouter
+- Together AI
+- Fireworks AI
+- And many more OpenAI-compatible APIs
+
+### OpenAIResponsesModel
+
+For OpenAI's newer Responses API with enhanced reasoning capabilities.
+
+```python
+from upsonic.models.openai import OpenAIResponsesModel
+
+model = OpenAIResponsesModel(
+    model_name='gpt-4o',
+    provider='openai',
+)
+```
+
+Supports the same parameters as `OpenAIChatModel` but uses the Responses API endpoint for advanced features like reasoning summaries and built-in tools.
+
+## Anthropic Models
+
+### AnthropicModel
+
+For Claude models via Anthropic's API.
+
+```python
+from upsonic.models.anthropic import AnthropicModel
+
+model = AnthropicModel(
+    model_name='claude-3-5-sonnet-20241022',
+    provider='anthropic',
+)
+```
+
+**Parameters:**
+- `model_name` (str): Anthropic model name (e.g., 'claude-3-5-sonnet-20241022', 'claude-3-opus-20240229')
+- `provider` (str | Provider): 'anthropic' or 'gateway'
+- `profile` (ModelProfileSpec | None): Model profile
+- `settings` (ModelSettings | None): Default settings
+
+**Features:**
+- Extended thinking support
+- Built-in tools (web search, code execution, MCP servers)
+- Prompt caching
+- Vision and document understanding
+
+## AWS Bedrock Models
+
+### BedrockConverseModel
+
+For AWS Bedrock models using the Converse API.
+
+```python
+from upsonic.models.bedrock import BedrockConverseModel
+
+model = BedrockConverseModel(
+    model_name='anthropic.claude-3-5-sonnet-20241022-v2:0',
+    provider='bedrock',
+)
+```
+
+**Parameters:**
+- `model_name` (str): Bedrock model ID or inference profile ARN
+- `provider` (str | Provider): 'bedrock' or 'gateway'
+- `profile` (ModelProfileSpec | None): Model profile
+- `settings` (ModelSettings | None): Default settings
+
+**Supported Models:**
+- Anthropic Claude (all versions)
+- Amazon Titan
+- Meta Llama
+- Cohere Command
+- Mistral
+- And more Bedrock foundation models
+
+**Features:**
+- Video and document support
+- Guardrails integration
+- Performance configuration
+- Token counting
+
+## Google Gemini Models
+
+### GoogleModel
+
+For Google Gemini models via Generative Language API or Vertex AI.
+
+```python
+from upsonic.models.google import GoogleModel
+
+model = GoogleModel(
+    model_name='gemini-2.0-flash',
+    provider='google-gla',  # or 'google-vertex'
+)
+```
+
+**Parameters:**
+- `model_name` (str): Gemini model name (e.g., 'gemini-2.0-flash', 'gemini-2.5-pro')
+- `provider` (str | Provider): 'google-gla' (Generative Language API) or 'google-vertex' (Vertex AI)
+- `profile` (ModelProfileSpec | None): Model profile
+- `settings` (ModelSettings | None): Default settings
+
+**Features:**
+- Built-in tools (web search, code execution, image generation)
+- Video understanding (including YouTube URLs)
+- Thinking mode
+- Grounding with Google Search
+- Token counting
+
+## Azure OpenAI Models
+
+### AzureModel
+
+Convenience wrapper for Azure OpenAI.
+
+```python
+from upsonic.models.azure import AzureModel
+
+model = AzureModel(
+    model_name='gpt-4o',
+    provider='azure',
+)
+```
+
+Inherits all functionality from `OpenAIChatModel` with Azure-specific defaults.
+
+## Groq Models
+
+### GroqModel
+
+For ultra-fast inference with Groq.
+
+```python
+from upsonic.models.groq import GroqModel
+
+model = GroqModel(
+    model_name='llama-3.3-70b-versatile',
+    provider='groq',
+)
+```
+
+**Parameters:**
+- `model_name` (str): Groq model name (e.g., 'llama-3.3-70b-versatile', 'mixtral-8x7b-32768')
+- `provider` (str | Provider): 'groq' or 'gateway'
+- `profile` (ModelProfileSpec | None): Model profile
+- `settings` (ModelSettings | None): Default settings
+
+**Features:**
+- Lightning-fast inference
+- Built-in web search (on supported models)
+- Reasoning models support
+- Vision support (on supported models)
+
+## Mistral Models
+
+### MistralModel
+
+For Mistral AI models.
+
+```python
+from upsonic.models.mistral import MistralModel
+
+model = MistralModel(
+    model_name='mistral-large-latest',
+    provider='mistral',
+)
+```
+
+**Parameters:**
+- `model_name` (str): Mistral model name (e.g., 'mistral-large-latest', 'mistral-small-latest')
+- `provider` (str | Provider): 'mistral'
+- `profile` (ModelProfileSpec | None): Model profile
+- `settings` (ModelSettings | None): Default settings
+- `json_mode_schema_prompt` (str): Prompt template for JSON mode
+
+**Features:**
+- Thinking mode
+- Function calling
+- Vision support
+- PDF document support
+
+## Ollama Models
+
+### OllamaModel
+
+For local models via Ollama.
+
+```python
+from upsonic.models.ollama import OllamaModel
+
+model = OllamaModel(
+    model_name='llama3.2',
+    provider='ollama',
+)
+```
+
+Inherits from `OpenAIChatModel` with Ollama-specific defaults. Connects to local Ollama server at `http://localhost:11434/api` by default.
+
+## Environment Variables
+
+Each provider requires appropriate API credentials:
+
+```bash
+# OpenAI
+export OPENAI_API_KEY="your-key"
+
+# Anthropic
+export ANTHROPIC_API_KEY="your-key"
+
+# Google
+export GOOGLE_API_KEY="your-key"  # For google-gla
+export GOOGLE_CLOUD_PROJECT="your-project"  # For google-vertex
+
+# AWS Bedrock
+export AWS_ACCESS_KEY_ID="your-key"
+export AWS_SECRET_ACCESS_KEY="your-secret"
+export AWS_REGION="us-east-1"
+
+# Azure
+export AZURE_OPENAI_API_KEY="your-key"
+export AZURE_OPENAI_ENDPOINT="https://your-resource.openai.azure.com"
+
+# Groq
+export GROQ_API_KEY="your-key"
+
+# Mistral
+export MISTRAL_API_KEY="your-key"
+```
+
+## Common Features
+
+All model providers support:
+
+- **Streaming**: Real-time response streaming
+- **Tool calling**: Function execution
+- **Vision**: Image understanding (where supported)
+- **Token counting**: Usage tracking
+- **Retry logic**: Automatic error handling
+- **Model settings**: Temperature, max tokens, etc.
+
+## Related
+
+- [Model Settings](/api/models/settings) - Configuration options
+- [Agents](/guides/agents) - Using models with agents
+- [Function Tools](/guides/function-tools) - Tool calling

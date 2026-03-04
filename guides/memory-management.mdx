@@ -1,0 +1,662 @@
+---
+title: Memory Management
+description: Storage backends, session management, and conversation history
+---
+
+# Memory Management
+
+Learn how to manage conversation history, session state, and user profiles using Upsonic's memory system. Enable agents to maintain context across interactions and remember important information.
+
+## Memory System Overview
+
+Upsonic's memory system provides:
+
+- **Session Memory**: Conversation history and context
+- **User Memory**: User profiles and preferences
+- **Summary Generation**: Automatic context summarization
+- **Multiple Storage Backends**: In-memory, file-based, database-backed
+- **Cross-Process Persistence**: Resume conversations across restarts
+
+Reference: `src/upsonic/storage/memory/memory.py:22-54`
+
+## Memory Architecture
+
+The `Memory` class orchestrates two types of memory:
+
+1. **Session Memory**: Chat history, summaries, session metadata
+2. **User Memory**: User profiles and traits extracted from conversations
+
+```python
+from upsonic.storage import InMemoryStorage
+from upsonic.storage.memory import Memory
+
+storage = InMemoryStorage()
+
+memory = Memory(
+    storage=storage,
+    session_id="session_001",
+    user_id="user_123",
+    full_session_memory=True,
+    summary_memory=True,
+    user_analysis_memory=True
+)
+```
+
+## Setting Up Memory
+
+<Steps>
+  <Step title="Choose Storage Backend">
+    Select a storage backend for your use case:
+
+    ```python
+    from upsonic.storage import (
+        InMemoryStorage,    # Fast, no persistence
+        JSONStorage,        # File-based, simple
+        SQLiteStorage,      # Local database
+        RedisStorage,       # Distributed, fast
+        PostgreSQLStorage,  # Production database
+        MongoDBStorage      # Document database
+    )
+
+    # Development: In-memory
+    storage = InMemoryStorage()
+
+    # Production: PostgreSQL
+    storage = PostgreSQLStorage(
+        connection_string="postgresql://user:pass@localhost/db"
+    )
+    ```
+  </Step>
+
+  <Step title="Configure Memory">
+    Enable memory features:
+
+    ```python
+    memory = Memory(
+        storage=storage,
+        
+        # Session identification
+        session_id="unique_session_id",
+        user_id="unique_user_id",
+        
+        # Memory features
+        full_session_memory=True,      # Store full chat history
+        summary_memory=True,            # Auto-generate summaries
+        user_analysis_memory=True,      # Extract user profile
+        
+        # Configuration
+        num_last_messages=20,           # Keep last 20 messages
+        model="openai/gpt-4o-mini",    # For summaries/analysis
+        debug=True
+    )
+    ```
+
+    Reference: `src/upsonic/storage/memory/memory.py:56-150`
+  </Step>
+
+  <Step title="Attach to Agent">
+    Connect memory to your agent:
+
+    ```python
+    from upsonic import Agent, Task
+
+    agent = Agent(
+        model="openai/gpt-4o",
+        memory=memory
+    )
+
+    # Memory is automatically used
+    agent.do(Task("Hello! My name is Alice."))
+    agent.do(Task("What's my name?"))  # Remembers: "Alice"
+    ```
+  </Step>
+</Steps>
+
+## Storage Backends
+
+### In-Memory Storage
+
+Fast but non-persistent:
+
+```python
+from upsonic.storage import InMemoryStorage
+
+storage = InMemoryStorage()
+memory = Memory(storage=storage)
+
+# Data lost when process ends
+```
+
+**Use for**: Testing, development, disposable sessions
+
+### JSON Storage
+
+File-based persistence:
+
+```python
+from upsonic.storage import JSONStorage
+
+storage = JSONStorage(
+    base_path="./data/sessions"
+)
+memory = Memory(storage=storage)
+
+# Data saved to JSON files
+```
+
+**Use for**: Small applications, simple persistence
+
+### SQLite Storage
+
+Local database:
+
+```python
+from upsonic.storage import SQLiteStorage
+
+storage = SQLiteStorage(
+    db_path="./data/sessions.db"
+)
+memory = Memory(storage=storage)
+```
+
+**Use for**: Desktop apps, local development
+
+### Redis Storage
+
+Distributed caching:
+
+```python
+from upsonic.storage import RedisStorage
+
+storage = RedisStorage(
+    host="localhost",
+    port=6379,
+    db=0,
+    password="your_password"
+)
+memory = Memory(storage=storage)
+```
+
+**Use for**: Distributed systems, high-performance needs
+
+### PostgreSQL Storage
+
+Production database:
+
+```python
+from upsonic.storage import PostgreSQLStorage
+
+storage = PostgreSQLStorage(
+    connection_string="postgresql://user:password@localhost:5432/dbname"
+)
+memory = Memory(storage=storage)
+```
+
+**Use for**: Production applications, enterprise systems
+
+### MongoDB Storage
+
+Document database:
+
+```python
+from upsonic.storage import MongoDBStorage
+
+storage = MongoDBStorage(
+    connection_string="mongodb://localhost:27017",
+    database_name="upsonic_db"
+)
+memory = Memory(storage=storage)
+```
+
+**Use for**: Flexible schema, large-scale applications
+
+## Memory Features
+
+### Full Session Memory
+
+Store complete conversation history:
+
+```python
+memory = Memory(
+    storage=storage,
+    full_session_memory=True,  # Enable full history
+    num_last_messages=50       # Keep last 50 messages
+)
+
+agent = Agent("openai/gpt-4o", memory=memory)
+
+# All messages are remembered
+agent.do(Task("What's the capital of France?"))
+agent.do(Task("What did I just ask?"))  # Remembers previous question
+```
+
+Reference: `src/upsonic/storage/memory/memory.py:99`
+
+### Summary Memory
+
+Automatically generate conversation summaries:
+
+```python
+memory = Memory(
+    storage=storage,
+    summary_memory=True,
+    model="openai/gpt-4o-mini"  # Used for summarization
+)
+
+agent = Agent("openai/gpt-4o", memory=memory)
+
+# After many turns, summary is auto-generated
+# and injected as context instead of full history
+```
+
+Reference: `src/upsonic/storage/memory/memory.py:100`
+
+### User Profile Memory
+
+Extract and remember user information:
+
+```python
+from pydantic import BaseModel
+
+class UserProfile(BaseModel):
+    name: str
+    interests: list[str]
+    preferences: dict
+
+memory = Memory(
+    storage=storage,
+    user_analysis_memory=True,
+    user_profile_schema=UserProfile,  # Structured profile
+    user_memory_mode='update'  # 'update' or 'replace'
+)
+
+agent = Agent("openai/gpt-4o", memory=memory)
+
+agent.do(Task("I love hiking and photography"))
+# Profile updated with interests
+
+agent.do(Task("Suggest activities for me"))
+# Agent uses remembered interests
+```
+
+Reference: `src/upsonic/storage/memory/memory.py:102-110`
+
+### Dynamic User Profiles
+
+Let the system discover profile schema:
+
+```python
+memory = Memory(
+    storage=storage,
+    user_analysis_memory=True,
+    dynamic_user_profile=True,  # Auto-discover schema
+    model="openai/gpt-4o"
+)
+
+# System automatically determines what to track
+# based on conversation content
+```
+
+## Session Management
+
+### Auto-Generated IDs
+
+```python
+# IDs are auto-generated if not provided
+memory = Memory(storage=storage)
+print(memory.session_id)  # Auto-generated UUID
+print(memory.user_id)     # Auto-generated UUID
+```
+
+Reference: `src/upsonic/storage/memory/memory.py:114-128`
+
+### Manual Session Control
+
+```python
+# Explicit session management
+memory = Memory(
+    storage=storage,
+    session_id="conversation_2024_01_15",
+    user_id="user_alice_123"
+)
+
+agent = Agent("openai/gpt-4o", memory=memory)
+```
+
+### Listing Sessions
+
+```python
+# Get all sessions for a user
+sessions = memory.list_sessions(user_id="user_alice_123")
+
+for session in sessions:
+    print(f"Session: {session.session_id}")
+    print(f"Created: {session.created_at}")
+    print(f"Message count: {len(session.messages)}")
+```
+
+Reference: `src/upsonic/storage/memory/memory.py:486-497`
+
+### Finding Specific Sessions
+
+```python
+# Load a specific session
+session = memory.find_session(session_id="session_001")
+
+if session:
+    print(f"Messages: {len(session.messages)}")
+    print(f"Metadata: {session.metadata}")
+```
+
+Reference: `src/upsonic/storage/memory/memory.py:499-525`
+
+### Session Metadata
+
+```python
+# Add custom metadata
+memory.set_metadata({
+    "platform": "web",
+    "version": "1.0",
+    "customer_tier": "premium"
+})
+
+# Retrieve metadata
+metadata = memory.get_metadata()
+print(metadata["platform"])  # "web"
+```
+
+Reference: `src/upsonic/storage/memory/memory.py:428-463`
+
+## Advanced Features
+
+### Message History
+
+Access conversation messages:
+
+```python
+# Get all messages
+messages = memory.get_messages()
+
+for msg in messages:
+    print(f"Role: {msg.role}")
+    print(f"Content: {msg.content}")
+```
+
+Reference: `src/upsonic/storage/memory/memory.py:414-426`
+
+### Feed Tool Results
+
+Include tool call results in history:
+
+```python
+memory = Memory(
+    storage=storage,
+    full_session_memory=True,
+    feed_tool_call_results=True  # Include tool outputs
+)
+
+# Tool calls and results are part of conversation history
+```
+
+Reference: `src/upsonic/storage/memory/memory.py:70`
+
+### Context Preparation
+
+Memory prepares context for each task:
+
+```python
+# Memory automatically provides:
+# - Message history
+# - Session summary (if enabled)
+# - User profile (if enabled)
+# - Session metadata
+
+prepared = await memory.prepare_inputs_for_task(
+    session_type=SessionType.AGENT,
+    agent_metadata={"version": "1.0"}
+)
+
+print(prepared["message_history"])       # Past messages
+print(prepared["context_injection"])     # Summary
+print(prepared["system_prompt_injection"]) # User profile
+print(prepared["metadata_injection"])    # Metadata
+```
+
+Reference: `src/upsonic/storage/memory/memory.py:221-323`
+
+### Cross-Process Resumption
+
+Resume conversations across restarts:
+
+```python
+# Process 1: Start conversation
+memory = Memory(
+    storage=PostgreSQLStorage(conn_str),
+    session_id="persistent_session"
+)
+agent = Agent("openai/gpt-4o", memory=memory)
+agent.do(Task("Remember: my favorite color is blue"))
+
+# Process 2: Resume later
+memory = Memory(
+    storage=PostgreSQLStorage(conn_str),
+    session_id="persistent_session"  # Same session ID
+)
+agent = Agent("openai/gpt-4o", memory=memory)
+agent.do(Task("What's my favorite color?"))  # "Blue"
+```
+
+## Usage Tracking
+
+### Session Usage
+
+Track token and cost metrics:
+
+```python
+from upsonic import Agent, Task
+
+agent = Agent("openai/gpt-4o", memory=memory)
+
+# Execute tasks
+agent.do(Task("Task 1"))
+agent.do(Task("Task 2"))
+agent.do(Task("Task 3"))
+
+# Get aggregated usage
+usage = agent.get_session_usage()
+
+print(f"Total tokens: {usage.total_tokens}")
+print(f"Prompt tokens: {usage.prompt_tokens}")
+print(f"Completion tokens: {usage.completion_tokens}")
+print(f"Total cost: ${usage.total_cost}")
+print(f"Requests: {usage.request_count}")
+```
+
+Reference: `src/upsonic/agent/agent.py:731-764`
+
+## Best Practices
+
+<Tip>
+**Choose the Right Backend**: Match storage to your needs:
+
+- **Development**: InMemoryStorage, SQLiteStorage
+- **Production**: PostgreSQLStorage, RedisStorage
+- **Scale**: MongoDBStorage for flexibility
+</Tip>
+
+<Tip>
+**Limit Message History**: Prevent token overflow with message limits:
+
+```python
+memory = Memory(
+    storage=storage,
+    full_session_memory=True,
+    num_last_messages=30  # Keep only recent 30 messages
+)
+```
+</Tip>
+
+<Warning>
+**Privacy Concerns**: Be careful with user data:
+
+- Use `user_analysis_memory` carefully in production
+- Encrypt sensitive data at rest
+- Implement data retention policies
+- Comply with GDPR/privacy regulations
+</Warning>
+
+<Tip>
+**Summary for Long Conversations**: Enable summary memory for efficiency:
+
+```python
+memory = Memory(
+    storage=storage,
+    summary_memory=True,  # Auto-summarize old messages
+    model="openai/gpt-4o-mini"  # Cheaper model for summaries
+)
+```
+</Tip>
+
+<Note>
+**Async Operations**: Memory supports async for better performance:
+
+```python
+# Async session operations
+session = await memory.get_session_async()
+messages = await memory.get_messages_async()
+sessions = await memory.list_sessions_async()
+```
+</Note>
+
+## Common Patterns
+
+### Stateful Chatbot
+
+```python
+from upsonic import Agent, Task
+from upsonic.storage import PostgreSQLStorage
+from upsonic.storage.memory import Memory
+
+storage = PostgreSQLStorage(connection_string=DB_URL)
+
+def create_chat_agent(session_id: str, user_id: str):
+    memory = Memory(
+        storage=storage,
+        session_id=session_id,
+        user_id=user_id,
+        full_session_memory=True,
+        summary_memory=True,
+        num_last_messages=20
+    )
+    
+    return Agent(
+        model="openai/gpt-4o",
+        name="Assistant",
+        memory=memory
+    )
+
+# Use in web app
+user_id = request.user.id
+session_id = request.session.id
+agent = create_chat_agent(session_id, user_id)
+
+response = agent.do(Task(user_message))
+```
+
+### Personalized Assistant
+
+```python
+from pydantic import BaseModel
+
+class UserPreferences(BaseModel):
+    name: str
+    timezone: str
+    interests: list[str]
+    communication_style: str
+
+memory = Memory(
+    storage=storage,
+    user_id=user_id,
+    user_analysis_memory=True,
+    user_profile_schema=UserPreferences,
+    user_memory_mode='update'
+)
+
+agent = Agent(
+    model="openai/gpt-4o",
+    memory=memory,
+    system_prompt="Adapt your communication style to the user's preferences."
+)
+```
+
+### Multi-Turn Research
+
+```python
+memory = Memory(
+    storage=storage,
+    session_id=research_session_id,
+    full_session_memory=True,
+    summary_memory=True,  # Summarize long research
+    model="openai/gpt-4o-mini"
+)
+
+research_agent = Agent(
+    model="openai/gpt-4o",
+    memory=memory,
+    tools=[web_search, document_reader]
+)
+
+# Multi-turn research session
+research_agent.do(Task("Research quantum computing"))
+research_agent.do(Task("What are the key applications?"))
+research_agent.do(Task("Compare with classical computing"))
+research_agent.do(Task("Summarize everything we've learned"))
+```
+
+## Database Configuration
+
+### PostgreSQL Setup
+
+```python
+from upsonic.storage import PostgreSQLStorage
+
+storage = PostgreSQLStorage(
+    connection_string="postgresql://user:password@localhost:5432/upsonic_db",
+    pool_size=10,
+    max_overflow=20
+)
+```
+
+### Redis Setup
+
+```python
+from upsonic.storage import RedisStorage
+
+storage = RedisStorage(
+    host="localhost",
+    port=6379,
+    db=0,
+    password="your_password",
+    max_connections=50,
+    decode_responses=True
+)
+```
+
+### MongoDB Setup
+
+```python
+from upsonic.storage import MongoDBStorage
+
+storage = MongoDBStorage(
+    connection_string="mongodb://localhost:27017",
+    database_name="upsonic",
+    collection_prefix="prod_"
+)
+```
+
+## Next Steps
+
+- [Building Agents](/guides/building-agents) - Use memory with agents
+- [Multi-Agent Workflows](/guides/multi-agent-workflows) - Shared team memory
+- [Safety Policies](/guides/safety-policies) - Privacy in stored data
+- [RAG Knowledge Base](/guides/rag-knowledge-base) - Combine with knowledge bases

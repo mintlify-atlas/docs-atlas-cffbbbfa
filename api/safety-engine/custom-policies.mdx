@@ -1,0 +1,763 @@
+---
+title: Custom Policies
+description: Create custom safety policies with rules and actions tailored to your needs
+---
+
+The Safety Engine allows you to create custom policies by composing rules (detection logic) and actions (enforcement behavior).
+
+## Policy Architecture
+
+A policy consists of three components:
+
+1. **Rule** - Detects specific content patterns or conditions
+2. **Action** - Defines what happens when rule triggers
+3. **Policy** - Combines rule + action into a reusable policy
+
+```python
+from upsonic.safety_engine import Policy
+
+custom_policy = Policy(
+    name="My Custom Policy",
+    description="Detects and blocks custom content",
+    rule=MyCustomRule(),
+    action=MyCustomAction()
+)
+```
+
+## Creating Custom Rules
+
+Rules inherit from `RuleBase` and implement pattern detection logic.
+
+### Basic Rule Structure
+
+```python
+from upsonic.safety_engine.base import RuleBase
+from upsonic.safety_engine.models import PolicyInput, RuleOutput
+from typing import Optional, Dict, Any
+import re
+
+class MyCustomRule(RuleBase):
+    """Detects custom content patterns"""
+    
+    name = "My Custom Rule"
+    description = "Detects specific keywords or patterns"
+    language = "en"  # Default language
+    
+    def __init__(self, options: Optional[Dict[str, Any]] = None):
+        super().__init__(options)
+        
+        # Define your detection patterns
+        self.keywords = [
+            "forbidden_word1",
+            "forbidden_word2",
+            "sensitive_term"
+        ]
+        
+        # Add custom patterns from options
+        if options and "keywords" in options:
+            self.keywords.extend(options["keywords"])
+    
+    def process(self, policy_input: PolicyInput) -> RuleOutput:
+        """Process input and return detection results"""
+        
+        # Combine all input texts
+        combined_text = " ".join(policy_input.input_texts or []).lower()
+        
+        # Find matching keywords
+        triggered_keywords = []
+        for keyword in self.keywords:
+            pattern = r'\b' + re.escape(keyword.lower()) + r'\b'
+            if re.search(pattern, combined_text):
+                triggered_keywords.append(keyword)
+        
+        # Return results
+        if not triggered_keywords:
+            return RuleOutput(
+                confidence=0.0,
+                content_type="SAFE",
+                details="No issues detected"
+            )
+        
+        # Calculate confidence (0.0 to 1.0)
+        confidence = min(1.0, len(triggered_keywords) * 0.4)
+        
+        return RuleOutput(
+            confidence=confidence,
+            content_type="CUSTOM_VIOLATION",
+            details=f"Detected {len(triggered_keywords)} violations",
+            triggered_keywords=triggered_keywords
+        )
+```
+
+### RuleOutput Fields
+
+- `confidence` (float): Detection confidence from 0.0 to 1.0
+- `content_type` (str): Category of detected content
+- `details` (str): Human-readable description
+- `triggered_keywords` (List[str]): List of detected items
+
+### Pattern-Based Rule Example
+
+```python
+import re
+from upsonic.safety_engine.base import RuleBase
+from upsonic.safety_engine.models import PolicyInput, RuleOutput
+
+class CompanySecretRule(RuleBase):
+    """Detects company confidential information"""
+    
+    name = "Company Secret Detection"
+    description = "Detects internal project names and confidential terms"
+    language = "en"
+    
+    def __init__(self, options=None):
+        super().__init__(options)
+        
+        # Internal project codenames
+        self.project_names = [
+            "Project Phoenix",
+            "Operation Atlas",
+            "Codename Titan"
+        ]
+        
+        # Confidential document patterns
+        self.doc_pattern = r'\b(CONFIDENTIAL|INTERNAL ONLY|DO NOT DISTRIBUTE)\b'
+        
+        # Internal ID patterns
+        self.id_pattern = r'\b[A-Z]{3}-\d{6}\b'  # e.g., EMP-123456
+    
+    def process(self, policy_input: PolicyInput) -> RuleOutput:
+        combined_text = " ".join(policy_input.input_texts or [])
+        triggered_items = []
+        
+        # Check project names
+        for project in self.project_names:
+            if project.lower() in combined_text.lower():
+                triggered_items.append(f"PROJECT:{project}")
+        
+        # Check confidential markers
+        if re.search(self.doc_pattern, combined_text, re.IGNORECASE):
+            triggered_items.append("CONFIDENTIAL_MARKER")
+        
+        # Check internal IDs
+        id_matches = re.findall(self.id_pattern, combined_text)
+        triggered_items.extend([f"INTERNAL_ID:{id}" for id in id_matches])
+        
+        if not triggered_items:
+            return RuleOutput(
+                confidence=0.0,
+                content_type="NO_SECRETS",
+                details="No confidential content detected"
+            )
+        
+        return RuleOutput(
+            confidence=1.0,  # High confidence for exact matches
+            content_type="CONFIDENTIAL",
+            details=f"Detected {len(triggered_items)} confidential items",
+            triggered_keywords=triggered_items
+        )
+```
+
+### LLM-Powered Rule Example
+
+```python
+from upsonic.safety_engine.base import RuleBase
+from upsonic.safety_engine.models import PolicyInput, RuleOutput
+
+class CustomLLMRule(RuleBase):
+    """Uses LLM for context-aware detection"""
+    
+    name = "LLM-Based Custom Rule"
+    description = "Uses LLM to detect custom content with context"
+    language = "en"
+    
+    def __init__(self, options=None, text_finder_llm=None):
+        super().__init__(options, text_finder_llm)
+    
+    def process(self, policy_input: PolicyInput) -> RuleOutput:
+        if not self.text_finder_llm:
+            # Fallback to pattern-based detection
+            return RuleOutput(
+                confidence=0.0,
+                content_type="NO_LLM",
+                details="LLM not available"
+            )
+        
+        try:
+            # Use LLM to find custom content type
+            # Available types: PERSONAL_IDENTIFIABLE_INFORMATION, ADULT_CONTENT, etc.
+            triggered_keywords = self._llm_find_keywords_with_input(
+                content_type="CUSTOM_CONTENT_TYPE",
+                policy_input=policy_input
+            )
+            
+            if not triggered_keywords:
+                return RuleOutput(
+                    confidence=0.0,
+                    content_type="SAFE",
+                    details="No issues detected by LLM"
+                )
+            
+            return RuleOutput(
+                confidence=0.9,  # LLM detection gets high confidence
+                content_type="CUSTOM_VIOLATION",
+                details=f"LLM detected {len(triggered_keywords)} items",
+                triggered_keywords=triggered_keywords
+            )
+        except Exception as e:
+            # Handle errors gracefully
+            return RuleOutput(
+                confidence=0.0,
+                content_type="ERROR",
+                details=f"Detection error: {str(e)}"
+            )
+```
+
+## Creating Custom Actions
+
+Actions inherit from `ActionBase` and define what happens when a rule triggers.
+
+### Action Types
+
+The `ActionBase` provides helper methods for common actions:
+
+- `allow_content()` - Allow content to pass through
+- `raise_block_error(message)` - Block with custom message
+- `raise_exception(message)` - Raise `DisallowedOperation`
+- `anonymize_triggered_keywords()` - Anonymize detected items
+- `replace_triggered_keywords(placeholder)` - Replace with placeholder
+- `llm_raise_block_error(reason)` - Block with LLM-generated message
+- `llm_raise_exception(reason)` - Exception with LLM message
+
+### Basic Action Structure
+
+```python
+from upsonic.safety_engine.base import ActionBase
+from upsonic.safety_engine.models import RuleOutput, PolicyOutput
+
+class MyCustomAction(ActionBase):
+    """Custom action implementation"""
+    
+    name = "My Custom Action"
+    description = "Custom enforcement behavior"
+    language = "en"
+    
+    def action(self, rule_result: RuleOutput) -> PolicyOutput:
+        """Execute action based on rule result"""
+        
+        # Allow content if confidence is low
+        if rule_result.confidence < 0.5:
+            return self.allow_content()
+        
+        # Block content with custom message
+        block_message = (
+            f"Content blocked: {rule_result.details}\n"
+            f"Violations: {len(rule_result.triggered_keywords or [])}"
+        )
+        
+        return self.raise_block_error(block_message)
+```
+
+### Block Action Example
+
+```python
+from upsonic.safety_engine.base import ActionBase
+from upsonic.safety_engine.models import RuleOutput, PolicyOutput
+
+class BlockCompanySecretsAction(ActionBase):
+    """Blocks content containing company secrets"""
+    
+    name = "Block Company Secrets"
+    description = "Prevents confidential information from being processed"
+    language = "en"
+    
+    def action(self, rule_result: RuleOutput) -> PolicyOutput:
+        # Allow if no secrets detected
+        if rule_result.confidence < 0.3:
+            return self.allow_content()
+        
+        # Block with detailed message
+        block_message = (
+            "This content contains confidential company information "
+            "and cannot be processed. Please remove any:\n"
+            "- Internal project names\n"
+            "- Confidential markers\n"
+            "- Internal employee or document IDs\n"
+            f"\nDetected: {', '.join(rule_result.triggered_keywords or [])}"
+        )
+        
+        return self.raise_block_error(block_message)
+```
+
+### Anonymization Action Example
+
+```python
+from upsonic.safety_engine.base import ActionBase
+from upsonic.safety_engine.models import RuleOutput, PolicyOutput
+
+class AnonymizeCompanySecretsAction(ActionBase):
+    """Anonymizes company secrets while allowing processing"""
+    
+    name = "Anonymize Company Secrets"
+    description = "Replaces secrets with random values (reversible)"
+    language = "en"
+    
+    def action(self, rule_result: RuleOutput) -> PolicyOutput:
+        if rule_result.confidence < 0.3:
+            return self.allow_content()
+        
+        # Use built-in anonymization
+        # - Original: "Project Phoenix team meeting"
+        # - Anonymized: "Yspqzdn Mcpxqrl team meeting"
+        # - LLM sees anonymized version
+        # - Response is de-anonymized automatically
+        return self.anonymize_triggered_keywords()
+```
+
+### Replace Action Example
+
+```python
+from upsonic.safety_engine.base import ActionBase
+from upsonic.safety_engine.models import RuleOutput, PolicyOutput
+
+class ReplaceCompanySecretsAction(ActionBase):
+    """Replaces secrets with placeholders"""
+    
+    name = "Replace Company Secrets"
+    description = "Replaces secrets with [REDACTED]"
+    language = "en"
+    
+    def action(self, rule_result: RuleOutput) -> PolicyOutput:
+        if rule_result.confidence < 0.3:
+            return self.allow_content()
+        
+        # Replace all detected secrets with placeholder
+        return self.replace_triggered_keywords("[CONFIDENTIAL]")
+```
+
+### Exception Action Example
+
+```python
+from upsonic.safety_engine.base import ActionBase
+from upsonic.safety_engine.models import RuleOutput, PolicyOutput
+
+class RaiseSecurityExceptionAction(ActionBase):
+    """Raises exception for security violations"""
+    
+    name = "Raise Security Exception"
+    description = "Raises DisallowedOperation for violations"
+    language = "en"
+    
+    def action(self, rule_result: RuleOutput) -> PolicyOutput:
+        if rule_result.confidence < 0.5:
+            return self.allow_content()
+        
+        exception_message = (
+            f"Security Policy Violation: {rule_result.content_type}\n"
+            f"Details: {rule_result.details}\n"
+            f"Triggered items: {len(rule_result.triggered_keywords or [])}"
+        )
+        
+        return self.raise_exception(exception_message)
+```
+
+### LLM-Enhanced Action Example
+
+```python
+from upsonic.safety_engine.base import ActionBase
+from upsonic.safety_engine.models import RuleOutput, PolicyOutput
+
+class LLMBlockAction(ActionBase):
+    """Uses LLM to generate contextual block messages"""
+    
+    name = "LLM Block Action"
+    description = "Generates appropriate block messages using LLM"
+    language = "en"
+    
+    def action(self, rule_result: RuleOutput) -> PolicyOutput:
+        if rule_result.confidence < 0.5:
+            return self.allow_content()
+        
+        # LLM generates contextual block message
+        reason = (
+            f"Content contains {rule_result.content_type}: "
+            f"{rule_result.details}"
+        )
+        
+        return self.llm_raise_block_error(reason)
+```
+
+### Custom Logic Action Example
+
+```python
+from upsonic.safety_engine.base import ActionBase
+from upsonic.safety_engine.models import RuleOutput, PolicyOutput
+import re
+
+class SelectiveAnonymizeAction(ActionBase):
+    """Anonymizes only specific types of secrets"""
+    
+    name = "Selective Anonymize"
+    description = "Anonymizes employee IDs, blocks everything else"
+    language = "en"
+    
+    def action(self, rule_result: RuleOutput) -> PolicyOutput:
+        if rule_result.confidence < 0.3:
+            return self.allow_content()
+        
+        triggered = rule_result.triggered_keywords or []
+        
+        # Check what types of secrets were found
+        has_employee_ids = any(k.startswith("INTERNAL_ID:") for k in triggered)
+        has_projects = any(k.startswith("PROJECT:") for k in triggered)
+        
+        # Anonymize employee IDs
+        if has_employee_ids and not has_projects:
+            return self.anonymize_triggered_keywords()
+        
+        # Block if project names detected
+        if has_projects:
+            return self.raise_block_error(
+                "Project names cannot be anonymized. "
+                "Please remove project references."
+            )
+        
+        # Default: allow other content
+        return self.allow_content()
+```
+
+## Combining Rules and Actions
+
+### Creating the Policy
+
+```python
+from upsonic.safety_engine import Policy
+
+# Create custom policy
+company_secrets_policy = Policy(
+    name="Company Secrets Policy",
+    description="Protects confidential company information",
+    rule=CompanySecretRule(),
+    action=BlockCompanySecretsAction()
+)
+
+# Use in agent
+from upsonic import Direct
+
+agent = Direct(
+    model="openai/gpt-4o",
+    safety_policies=[company_secrets_policy]
+)
+
+# Policy is enforced automatically
+try:
+    result = agent.run("Tell me about Project Phoenix")
+except Exception as e:
+    print(f"Blocked: {e}")
+```
+
+### Multiple Action Types
+
+```python
+# Create different policies with same rule
+from upsonic.safety_engine import Policy
+
+# Policy 1: Block secrets
+block_policy = Policy(
+    name="Block Company Secrets",
+    description="Blocks confidential content",
+    rule=CompanySecretRule(),
+    action=BlockCompanySecretsAction()
+)
+
+# Policy 2: Anonymize secrets
+anonymize_policy = Policy(
+    name="Anonymize Company Secrets",
+    description="Anonymizes confidential content",
+    rule=CompanySecretRule(),
+    action=AnonymizeCompanySecretsAction()
+)
+
+# Policy 3: Raise exception
+exception_policy = Policy(
+    name="Company Secrets Exception",
+    description="Raises exception for violations",
+    rule=CompanySecretRule(),
+    action=RaiseSecurityExceptionAction()
+)
+
+# Choose based on use case
+agent = Direct(
+    model="openai/gpt-4o",
+    safety_policies=[anonymize_policy]  # Or block_policy, exception_policy
+)
+```
+
+## Advanced Patterns
+
+### Configurable Rules
+
+```python
+class ConfigurableRule(RuleBase):
+    """Rule with runtime configuration"""
+    
+    name = "Configurable Detection Rule"
+    description = "Configurable keyword and pattern detection"
+    language = "en"
+    
+    def __init__(self, options=None):
+        super().__init__(options)
+        
+        # Load configuration
+        self.keywords = options.get("keywords", []) if options else []
+        self.patterns = options.get("patterns", []) if options else []
+        self.threshold = options.get("threshold", 0.5) if options else 0.5
+        self.case_sensitive = options.get("case_sensitive", False) if options else False
+    
+    def process(self, policy_input: PolicyInput) -> RuleOutput:
+        combined_text = " ".join(policy_input.input_texts or [])
+        if not self.case_sensitive:
+            combined_text = combined_text.lower()
+        
+        triggered = []
+        
+        # Check keywords
+        for keyword in self.keywords:
+            check_keyword = keyword if self.case_sensitive else keyword.lower()
+            if check_keyword in combined_text:
+                triggered.append(keyword)
+        
+        # Check patterns
+        for pattern in self.patterns:
+            flags = 0 if self.case_sensitive else re.IGNORECASE
+            if re.search(pattern, combined_text, flags):
+                triggered.append(f"PATTERN:{pattern}")
+        
+        if not triggered:
+            return RuleOutput(
+                confidence=0.0,
+                content_type="SAFE",
+                details="No matches"
+            )
+        
+        confidence = min(1.0, len(triggered) * 0.3)
+        
+        return RuleOutput(
+            confidence=confidence,
+            content_type="VIOLATION" if confidence >= self.threshold else "SAFE",
+            details=f"Detected {len(triggered)} matches",
+            triggered_keywords=triggered
+        )
+
+# Usage with configuration
+my_rule = ConfigurableRule(options={
+    "keywords": ["secret", "confidential", "internal"],
+    "patterns": [r'\b[A-Z]{3}-\d{6}\b'],
+    "threshold": 0.7,
+    "case_sensitive": False
+})
+
+my_policy = Policy(
+    name="Configurable Policy",
+    description="Policy with runtime configuration",
+    rule=my_rule,
+    action=BlockCompanySecretsAction()
+)
+```
+
+### Threshold-Based Actions
+
+```python
+class ThresholdAction(ActionBase):
+    """Action with different behaviors based on confidence"""
+    
+    name = "Threshold Action"
+    description = "Different actions based on confidence level"
+    language = "en"
+    
+    def action(self, rule_result: RuleOutput) -> PolicyOutput:
+        confidence = rule_result.confidence
+        
+        # Low confidence: allow
+        if confidence < 0.3:
+            return self.allow_content()
+        
+        # Medium confidence: anonymize
+        elif confidence < 0.7:
+            return self.anonymize_triggered_keywords()
+        
+        # High confidence: block
+        else:
+            return self.raise_block_error(
+                f"High confidence violation detected: {rule_result.details}"
+            )
+```
+
+### Logging and Monitoring
+
+```python
+import logging
+from upsonic.safety_engine.base import ActionBase
+from upsonic.safety_engine.models import RuleOutput, PolicyOutput
+
+logger = logging.getLogger(__name__)
+
+class LoggingAction(ActionBase):
+    """Action that logs all detections"""
+    
+    name = "Logging Action"
+    description = "Logs violations and blocks content"
+    language = "en"
+    
+    def action(self, rule_result: RuleOutput) -> PolicyOutput:
+        # Always log detections
+        if rule_result.confidence > 0:
+            logger.warning(
+                f"Safety policy triggered: {rule_result.content_type}",
+                extra={
+                    "confidence": rule_result.confidence,
+                    "details": rule_result.details,
+                    "triggered_keywords": rule_result.triggered_keywords,
+                    "content_preview": self.original_content[0][:100] if self.original_content else None
+                }
+            )
+        
+        # Block high confidence violations
+        if rule_result.confidence >= 0.7:
+            logger.error(
+                f"Content blocked: {rule_result.content_type}",
+                extra={"triggered": rule_result.triggered_keywords}
+            )
+            return self.raise_block_error(
+                f"Security violation: {rule_result.details}"
+            )
+        
+        # Allow low confidence
+        return self.allow_content()
+```
+
+## Testing Custom Policies
+
+```python
+from upsonic.safety_engine.models import PolicyInput
+
+# Test your rule
+rule = CompanySecretRule()
+policy_input = PolicyInput(
+    input_texts=["Discussing Project Phoenix with the team"]
+)
+result = rule.process(policy_input)
+
+print(f"Confidence: {result.confidence}")
+print(f"Type: {result.content_type}")
+print(f"Details: {result.details}")
+print(f"Triggered: {result.triggered_keywords}")
+
+# Test your action
+action = BlockCompanySecretsAction()
+policy_output = action.execute_action(
+    rule_result=result,
+    original_content=["Discussing Project Phoenix with the team"],
+    language="en"
+)
+
+print(f"Action result: {policy_output.action_type}")
+print(f"Modified content: {policy_output.modified_content}")
+```
+
+## Best Practices
+
+### Rule Design
+
+1. **Be Specific**: Use precise patterns to avoid false positives
+2. **Handle Edge Cases**: Test with various input formats
+3. **Set Appropriate Thresholds**: Balance sensitivity vs accuracy
+4. **Provide Context**: Include details in `RuleOutput` for debugging
+
+### Action Design
+
+1. **Clear Messages**: Provide helpful feedback to users
+2. **Graceful Degradation**: Handle errors without breaking the system
+3. **Performance**: Keep actions fast, especially for high-volume usage
+4. **Security**: Never leak sensitive data in error messages
+
+### Testing
+
+1. **Unit Test Rules**: Test detection with known inputs
+2. **Unit Test Actions**: Verify behavior for different confidence levels
+3. **Integration Test**: Test full policy in agent context
+4. **Edge Cases**: Test boundary conditions and malformed input
+
+### Performance
+
+1. **Lazy Loading**: Load heavy models only when needed
+2. **Caching**: Cache compiled patterns and model results
+3. **Batch Processing**: Process multiple texts efficiently
+4. **Async Support**: Use async methods for I/O operations
+
+## Policy Base Classes Reference
+
+### RuleBase
+
+```python
+class RuleBase(ABC):
+    name: str = "Base Rule"
+    description: str = "Base rule description"
+    language: str = "en"
+    
+    def __init__(self, options: Optional[Dict[str, Any]] = None, text_finder_llm=None):
+        self.options = options or {}
+        self.text_finder_llm = text_finder_llm
+    
+    @abstractmethod
+    def process(self, policy_input: PolicyInput) -> RuleOutput:
+        """Process input and return rule result"""
+        pass
+    
+    def _llm_find_keywords_with_input(self, content_type: str, policy_input: PolicyInput) -> List[str]:
+        """Use LLM to find keywords"""
+        pass
+```
+
+### ActionBase
+
+```python
+class ActionBase(ABC):
+    name: str = "Base Action"
+    description: str = "Base action description"
+    language: str = "en"
+    
+    @abstractmethod
+    def action(self, rule_result: RuleOutput) -> PolicyOutput:
+        """Execute action based on rule result"""
+        pass
+    
+    # Helper methods
+    def allow_content(self) -> PolicyOutput: ...
+    def raise_block_error(self, message: str) -> PolicyOutput: ...
+    def raise_exception(self, message: str) -> PolicyOutput: ...
+    def anonymize_triggered_keywords(self) -> PolicyOutput: ...
+    def replace_triggered_keywords(self, placeholder: str) -> PolicyOutput: ...
+    def llm_raise_block_error(self, reason: str) -> PolicyOutput: ...
+    def llm_raise_exception(self, reason: str) -> PolicyOutput: ...
+```
+
+### Policy
+
+```python
+class Policy:
+    def __init__(
+        self,
+        name: str,
+        description: str,
+        rule: RuleBase,
+        action: ActionBase,
+        language: str = "en",
+        language_identify_llm=None,
+        base_llm=None,
+        text_finder_llm=None
+    ): ...
+    
+    def check(self, policy_input: PolicyInput) -> RuleOutput: ...
+    def execute(self, policy_input: PolicyInput) -> tuple[RuleOutput, ActionOutput, PolicyOutput]: ...
+```

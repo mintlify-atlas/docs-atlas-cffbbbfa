@@ -1,0 +1,523 @@
+---
+title: KnowledgeBase
+description: Complete API reference for the KnowledgeBase class - RAG and document management
+---
+
+## Overview
+
+The KnowledgeBase class is the central orchestrator for Retrieval-Augmented Generation (RAG) in the Upsonic framework. It manages the complete lifecycle of documents from ingestion and processing to vector storage and intelligent retrieval.
+
+## Class Definition
+
+```python
+from upsonic import KnowledgeBase
+from upsonic.vectordb import ChromaProvider, ChromaConfig
+from upsonic.embeddings import OpenAIEmbedding
+
+config = ChromaConfig(collection_name="my_docs")
+vectordb = ChromaProvider(config=config)
+embedding = OpenAIEmbedding()
+
+kb = KnowledgeBase(
+    sources=["docs/", "README.md"],
+    vectordb=vectordb,
+    embedding_provider=embedding
+)
+```
+
+## Constructor Parameters
+
+<ParamField path="sources" type="Union[str, Path, List[Union[str, Path]]]" required>
+  Source identifiers - file paths, directory paths, or direct content strings. Can be a single source or list.
+</ParamField>
+
+<ParamField path="vectordb" type="BaseVectorDBProvider" required>
+  Vector database provider instance for storage and retrieval (Chroma, Qdrant, Pinecone, etc.)
+</ParamField>
+
+<ParamField path="embedding_provider" type="EmbeddingProvider" default="None">
+  Embedding provider for converting text to vectors. Optional for providers that handle embeddings internally (e.g., SuperMemory).
+</ParamField>
+
+<ParamField path="splitters" type="Union[BaseChunker, List[BaseChunker]]" default="None">
+  Text chunking strategy. If None, intelligent auto-detection is used. Can be a single chunker or list matching source count.
+</ParamField>
+
+<ParamField path="loaders" type="Union[BaseLoader, List[BaseLoader]]" default="None">
+  Document loaders for various file types. If None, auto-detected based on file extensions.
+</ParamField>
+
+<ParamField path="name" type="str" default="None">
+  Human-readable name for the knowledge base. If None, uses first 16 chars of knowledge_id.
+</ParamField>
+
+<ParamField path="description" type="str" default="None">
+  Description of the knowledge base content and purpose
+</ParamField>
+
+<ParamField path="topics" type="List[str]" default="None">
+  List of topics covered by this knowledge base
+</ParamField>
+
+<ParamField path="use_case" type="str" default="rag_retrieval">
+  Intended use case for chunking optimization ("rag_retrieval", "semantic_search", "question_answering", etc.)
+</ParamField>
+
+<ParamField path="quality_preference" type="str" default="balanced">
+  Speed vs quality trade-off: "fast", "balanced", or "quality"
+</ParamField>
+
+<ParamField path="loader_config" type="Dict[str, Any]" default="None">
+  Specific configuration for document loaders
+</ParamField>
+
+<ParamField path="splitter_config" type="Dict[str, Any]" default="None">
+  Specific configuration for text splitters
+</ParamField>
+
+## Lifecycle Methods
+
+### setup_async()
+
+Process and index all documents. This method is idempotent and automatically called by query methods.
+
+```python
+await kb.setup_async()
+```
+
+**What it does:**
+1. Checks if knowledge is already indexed (skip if yes)
+2. Connects to vector database
+3. Loads documents from sources
+4. Chunks documents into embeddable pieces
+5. Generates embeddings
+6. Stores everything in vector database
+
+<ResponseField name="void" type="None">
+  Completes setup or skips if already done
+</ResponseField>
+
+### setup_rag()
+
+Synchronous wrapper for setup_async().
+
+```python
+kb.setup_rag()
+```
+
+## Query Methods
+
+### query_async()
+
+Perform asynchronous RAG query to retrieve relevant knowledge.
+
+```python
+results = await kb.query_async(
+    query="What is machine learning?",
+    top_k=5,
+    search_type="hybrid"
+)
+```
+
+<ParamField path="query" type="str" required>
+  The user's query string or question
+</ParamField>
+
+<ParamField path="top_k" type="int" default="None">
+  Number of results to return. If None, uses provider's default or Task's vector_search_top_k.
+</ParamField>
+
+<ParamField path="filter" type="Dict[str, Any]" default="None">
+  Optional metadata filter to apply (e.g., `{{"source": "manual.pdf"}}`)
+</ParamField>
+
+<ParamField path="search_type" type="Literal['auto', 'dense', 'full_text', 'hybrid']" default="auto">
+  Type of search:
+  - **auto**: Automatically choose based on provider capabilities
+  - **dense**: Pure vector similarity search
+  - **full_text**: Text-based search (if supported)
+  - **hybrid**: Combined vector + text search (if supported)
+</ParamField>
+
+<ParamField path="task" type="Task" default="None">
+  Optional Task object. Uses Task's vector search parameters to override defaults.
+</ParamField>
+
+<ParamField path="**search_kwargs" type="Any">
+  Additional search parameters:
+  - `alpha` (float): Weighting for hybrid search
+  - `fusion_method` (str): "rrf" or "weighted"
+  - `similarity_threshold` (float): Minimum score threshold
+</ParamField>
+
+<ResponseField name="results" type="List[RAGSearchResult]">
+  List of RAGSearchResult objects containing text content, metadata, and scores
+</ResponseField>
+
+### query()
+
+Synchronous wrapper for query_async().
+
+```python
+results = kb.query("What is AI?")
+```
+
+### search()
+
+Search as a tool method (returns formatted string).
+
+```python
+result_text = await kb.search("How do I configure authentication?")
+```
+
+<ParamField path="query" type="str" required>
+  The question or search query
+</ParamField>
+
+<ResponseField name="result" type="str">
+  Formatted string with search results or "No relevant information found" message
+</ResponseField>
+
+## Tool Integration
+
+KnowledgeBase automatically creates a dynamic search tool based on its name:
+
+```python
+from upsonic import KnowledgeBase, Agent, Task
+
+kb = KnowledgeBase(
+    name="technical_docs",
+    sources=["docs/"],
+    vectordb=vectordb,
+    embedding_provider=embedding
+)
+
+# The KB creates a tool named "search_technical_docs"
+agent = Agent(
+    "openai/gpt-4o",
+    tools=[kb]  # Add KB as a tool
+)
+
+task = Task("How do I configure SSL?")
+result = agent.do(task)
+# Agent automatically calls search_technical_docs tool
+```
+
+## Properties
+
+### knowledge_id
+
+Unique, deterministic hash for this knowledge configuration.
+
+```python
+id = kb.knowledge_id
+```
+
+<ResponseField name="id" type="str">
+  SHA256 hash based on sources and component configuration
+</ResponseField>
+
+### name
+
+Human-readable name.
+
+```python
+name = kb.name
+```
+
+<ResponseField name="name" type="str">
+  KB name or truncated knowledge_id
+</ResponseField>
+
+### rag
+
+RAG-enabled flag.
+
+```python
+if kb.rag:
+    print("RAG is enabled")
+```
+
+<ResponseField name="rag" type="bool">
+  Always True for KnowledgeBase instances
+</ResponseField>
+
+## Usage Examples
+
+### Basic RAG Setup
+
+```python
+from upsonic import KnowledgeBase, Agent, Task
+from upsonic.vectordb import ChromaProvider, ChromaConfig
+from upsonic.embeddings import OpenAIEmbedding
+
+# Setup knowledge base
+config = ChromaConfig(collection_name="docs")
+vectordb = ChromaProvider(config=config)
+embedding = OpenAIEmbedding()
+
+kb = KnowledgeBase(
+    sources=["docs/"],
+    vectordb=vectordb,
+    embedding_provider=embedding,
+    name="Documentation"
+)
+
+await kb.setup_async()
+
+# Query the knowledge base
+results = await kb.query_async("How do I install the library?")
+for result in results:
+    print(f"Score: {result.score}")
+    print(f"Text: {result.text}")
+    print(f"Source: {result.metadata.get('source')}")
+```
+
+### KB as Agent Tool
+
+```python
+from upsonic import KnowledgeBase, Agent, Task
+
+kb = KnowledgeBase(
+    name="company_knowledge",
+    sources=["handbook.pdf", "policies/"],
+    vectordb=vectordb,
+    embedding_provider=embedding
+)
+
+agent = Agent(
+    "openai/gpt-4o",
+    tools=[kb]  # Agent can search the KB
+)
+
+task = Task("What is our vacation policy?")
+result = agent.do(task)
+# Agent uses search_company_knowledge tool automatically
+```
+
+### Task with KB Context
+
+```python
+from upsonic import KnowledgeBase, Agent, Task
+
+kb = KnowledgeBase(
+    sources=["technical_docs/"],
+    vectordb=vectordb,
+    embedding_provider=embedding
+)
+
+task = Task(
+    description="Explain how to configure authentication",
+    context=[kb],
+    vector_search_top_k=5,
+    vector_search_filter={"section": "auth"}
+)
+
+agent = Agent("openai/gpt-4o")
+result = agent.do(task)
+```
+
+### Multiple Knowledge Bases
+
+```python
+from upsonic import KnowledgeBase, Agent, Task
+
+# Technical documentation
+tech_kb = KnowledgeBase(
+    name="technical_docs",
+    sources=["docs/api/", "docs/guides/"],
+    vectordb=tech_vectordb,
+    embedding_provider=embedding
+)
+
+# User guides
+user_kb = KnowledgeBase(
+    name="user_guides",
+    sources=["docs/user/"],
+    vectordb=user_vectordb,
+    embedding_provider=embedding
+)
+
+# Agent with access to both
+agent = Agent(
+    "openai/gpt-4o",
+    tools=[tech_kb, user_kb]
+)
+
+task = Task("How do I get started?")
+result = agent.do(task)
+# Agent chooses which KB to search based on the question
+```
+
+### Advanced Search Configuration
+
+```python
+from upsonic import KnowledgeBase
+
+kb = KnowledgeBase(
+    sources=["docs/"],
+    vectordb=vectordb,
+    embedding_provider=embedding
+)
+
+await kb.setup_async()
+
+# Hybrid search with custom parameters
+results = await kb.query_async(
+    query="What is the API authentication flow?",
+    top_k=10,
+    search_type="hybrid",
+    alpha=0.7,  # 70% vector, 30% full-text
+    fusion_method="rrf",
+    similarity_threshold=0.6,
+    filter={"section": "api", "version": "v2"}
+)
+```
+
+### Custom Chunking Strategy
+
+```python
+from upsonic import KnowledgeBase
+from upsonic.text_splitter import RecursiveChunker
+
+# Custom chunker
+chunker = RecursiveChunker(
+    chunk_size=512,
+    chunk_overlap=50
+)
+
+kb = KnowledgeBase(
+    sources=["large_docs/"],
+    vectordb=vectordb,
+    embedding_provider=embedding,
+    splitters=chunker,
+    quality_preference="quality"
+)
+```
+
+### Direct Content Sources
+
+```python
+from upsonic import KnowledgeBase
+
+# Mix of files and direct content
+sources = [
+    "README.md",
+    "docs/",
+    """This is direct content that will be indexed.
+    You can provide strings directly as sources."""
+]
+
+kb = KnowledgeBase(
+    sources=sources,
+    vectordb=vectordb,
+    embedding_provider=embedding
+)
+```
+
+### Processing Statistics
+
+```python
+from upsonic import KnowledgeBase
+
+kb = KnowledgeBase(
+    sources=["docs/"],
+    vectordb=vectordb,
+    embedding_provider=embedding
+)
+
+await kb.setup_async()
+
+# Access processing stats
+stats = kb._processing_stats
+print(f"Sources: {stats['sources_count']}")
+print(f"Documents: {stats['documents_count']}")
+print(f"Chunks: {stats['chunks_count']}")
+print(f"Indexed at: {stats['indexed_at']}")
+```
+
+### Multi-Source with Custom Loaders
+
+```python
+from upsonic import KnowledgeBase
+from upsonic.loaders import PDFLoader, TextLoader, MarkdownLoader
+
+# Different loader for each source type
+sources = ["manual.pdf", "guide.txt", "README.md"]
+loaders = [PDFLoader(), TextLoader(), MarkdownLoader()]
+
+kb = KnowledgeBase(
+    sources=sources,
+    loaders=loaders,  # One-to-one mapping
+    vectordb=vectordb,
+    embedding_provider=embedding
+)
+```
+
+## Integration Examples
+
+### RAG with Streaming
+
+```python
+from upsonic import KnowledgeBase, Agent, Task
+
+kb = KnowledgeBase(
+    name="docs",
+    sources=["documentation/"],
+    vectordb=vectordb,
+    embedding_provider=embedding
+)
+
+agent = Agent("openai/gpt-4o", tools=[kb])
+
+task = Task("Explain the authentication system")
+
+# Stream response in real-time
+for chunk in agent.stream(task):
+    print(chunk, end="", flush=True)
+```
+
+### RAG with Memory
+
+```python
+from upsonic import KnowledgeBase, Agent, Task, Memory, InMemoryStorage
+
+kb = KnowledgeBase(
+    name="knowledge",
+    sources=["docs/"],
+    vectordb=vectordb,
+    embedding_provider=embedding
+)
+
+memory = Memory(
+    storage=InMemoryStorage(),
+    full_session_memory=True
+)
+
+agent = Agent(
+    "openai/gpt-4o",
+    tools=[kb],
+    memory=memory
+)
+
+# Multi-turn conversation with RAG
+agent.do("What are the main features?")
+agent.do("Tell me more about the first feature")  # Uses conversation context
+```
+
+## Supported File Types
+
+KnowledgeBase supports automatic loading and processing of:
+
+- **Text**: .txt, .md, .rst, .log
+- **Code**: .py, .js, .ts, .java, .c, .cpp, .cs, .go, .rs, .php, .rb
+- **Web**: .html, .htm, .xhtml, .css, .xml
+- **Data**: .json, .jsonl, .yaml, .yml, .ini, .csv
+- **Documents**: .pdf, .docx
+
+## Related Classes
+
+- [Agent](/api/agent) - Use KB as a tool
+- [Task](/api/task) - Configure RAG queries
+- [VectorDB Providers](/vectordb/overview) - Storage backends
+- [Embeddings](/embeddings/overview) - Vector generation

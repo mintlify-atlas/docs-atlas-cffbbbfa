@@ -1,0 +1,449 @@
+---
+title: Storage Backends
+description: API reference for storage backend classes (Redis, PostgreSQL, MongoDB, SQLite, and more)
+---
+
+## Storage Backends
+
+Upsonic provides multiple storage backends for persisting agent sessions and user memory data. All backends implement the same `Storage` interface, allowing you to switch between them easily.
+
+## RedisStorage
+
+Redis-based storage implementation with automatic key prefixing and optional TTL.
+
+### Initialization
+
+```python
+from upsonic.storage.redis import RedisStorage
+
+# Using Redis URL
+storage = RedisStorage(db_url="redis://localhost:6379/0")
+
+# Using existing Redis client
+from redis import Redis
+client = Redis.from_url("redis://localhost:6379/0")
+storage = RedisStorage(redis_client=client)
+
+# With custom prefix and TTL
+storage = RedisStorage(
+    db_url="redis://localhost:6379/0",
+    db_prefix="myapp",
+    expire=86400,  # 24 hours
+)
+```
+
+### Constructor Parameters
+
+<ParamField path="redis_client" type="Union[Redis, RedisCluster]" default="None">
+  Existing Redis/RedisCluster client instance
+</ParamField>
+
+<ParamField path="db_url" type="str" default="None">
+  Redis connection URL (e.g., "redis://localhost:6379/0")
+</ParamField>
+
+<ParamField path="db_prefix" type="str" default="'upsonic'">
+  Prefix for all Redis keys for namespace isolation
+</ParamField>
+
+<ParamField path="expire" type="int" default="None">
+  TTL in seconds for Redis keys (optional automatic expiration)
+</ParamField>
+
+<ParamField path="session_table" type="str" default="'sessions'">
+  Name override for session table
+</ParamField>
+
+<ParamField path="user_memory_table" type="str" default="'user_memories'">
+  Name override for user memory table
+</ParamField>
+
+<ParamField path="id" type="str" default="auto-generated">
+  Unique identifier for this storage instance
+</ParamField>
+
+### Features
+
+- Automatic key prefixing for namespace isolation
+- Optional TTL (expire) for automatic data expiration
+- Index-based lookups for efficient filtering
+- Support for both single Redis and Redis Cluster
+
+---
+
+## PostgresStorage
+
+Synchronous PostgreSQL storage implementation using SQLAlchemy with full JSONB support.
+
+### Initialization
+
+```python
+from upsonic.storage.postgres import PostgresStorage
+
+storage = PostgresStorage(
+    db_url="postgresql://user:pass@localhost:5432/db"
+)
+
+# With custom schema
+storage = PostgresStorage(
+    db_url="postgresql://user:pass@localhost:5432/db",
+    db_schema="myapp",
+    create_schema=True
+)
+```
+
+### Constructor Parameters
+
+<ParamField path="db_url" type="str" default="None">
+  PostgreSQL connection URL
+</ParamField>
+
+<ParamField path="db_engine" type="Engine" default="None">
+  Pre-configured SQLAlchemy Engine
+</ParamField>
+
+<ParamField path="db_schema" type="str" default="'public'">
+  PostgreSQL schema to use
+</ParamField>
+
+<ParamField path="session_table" type="str" default="'upsonic_sessions'">
+  Name of the session table
+</ParamField>
+
+<ParamField path="user_memory_table" type="str" default="'upsonic_user_memories'">
+  Name of the user memory table
+</ParamField>
+
+<ParamField path="create_schema" type="bool" default="True">
+  Whether to create the schema if it doesn't exist
+</ParamField>
+
+<ParamField path="id" type="str" default="auto-generated">
+  Unique identifier for this storage instance
+</ParamField>
+
+### Connection Pool Configuration
+
+When creating an engine from `db_url`, these settings are applied:
+- `pool_pre_ping=True`: Validates connections before use
+- `pool_recycle=3600`: Recycles connections after 1 hour
+
+### Features
+
+- Full JSONB support for efficient querying
+- Automatic schema creation
+- Connection pool management with health checks
+- Index support for fast lookups
+
+---
+
+## MongoStorage
+
+Synchronous MongoDB storage implementation using PyMongo.
+
+### Initialization
+
+```python
+from upsonic.storage.mongo import MongoStorage
+
+storage = MongoStorage(
+    db_url="mongodb://localhost:27017",
+    db_name="upsonic_db",
+)
+
+# Using existing MongoDB client
+from pymongo import MongoClient
+client = MongoClient("mongodb://localhost:27017")
+storage = MongoStorage(
+    db_client=client,
+    db_name="upsonic_db"
+)
+```
+
+### Constructor Parameters
+
+<ParamField path="db_client" type="MongoClient" default="None">
+  Pre-configured MongoDB client instance
+</ParamField>
+
+<ParamField path="db_name" type="str" default="'upsonic'">
+  Name of the database to use
+</ParamField>
+
+<ParamField path="db_url" type="str" default="None">
+  MongoDB connection URL
+</ParamField>
+
+<ParamField path="session_collection" type="str" default="'upsonic_sessions'">
+  Name of the collection to store sessions
+</ParamField>
+
+<ParamField path="user_memory_collection" type="str" default="'upsonic_user_memories'">
+  Name of the collection to store user memories
+</ParamField>
+
+<ParamField path="id" type="str" default="auto-generated">
+  Unique identifier for this storage instance
+</ParamField>
+
+### Features
+
+- Automatic collection and index creation
+- Efficient bulk operations
+- Native JSON document storage
+- Flexible schema support
+
+---
+
+## SqliteStorage
+
+Synchronous SQLite storage implementation using SQLAlchemy.
+
+### Initialization
+
+```python
+from upsonic.storage.sqlite import SqliteStorage
+
+# Using file path
+storage = SqliteStorage(db_file="./agent_data.db")
+
+# Using SQLAlchemy URL
+storage = SqliteStorage(db_url="sqlite:///./data.db")
+
+# Default (creates ./upsonic.db in current directory)
+storage = SqliteStorage()
+```
+
+### Constructor Parameters
+
+<ParamField path="db_file" type="str" default="None">
+  Path to the SQLite database file
+</ParamField>
+
+<ParamField path="db_engine" type="Engine" default="None">
+  Pre-configured SQLAlchemy Engine
+</ParamField>
+
+<ParamField path="db_url" type="str" default="None">
+  SQLAlchemy database URL (e.g., "sqlite:///./data.db")
+</ParamField>
+
+<ParamField path="session_table" type="str" default="'upsonic_sessions'">
+  Name of the session table
+</ParamField>
+
+<ParamField path="user_memory_table" type="str" default="'upsonic_user_memories'">
+  Name of the user memory table
+</ParamField>
+
+<ParamField path="id" type="str" default="auto-generated">
+  Unique identifier for this storage instance
+</ParamField>
+
+### Features
+
+- File-based persistence
+- No external dependencies required
+- Automatic database and table creation
+- JSON support for complex data structures
+
+---
+
+## InMemoryStorage
+
+In-memory storage implementation using Python dictionaries. Data is NOT persistent.
+
+### Initialization
+
+```python
+from upsonic.storage.in_memory import InMemoryStorage
+
+storage = InMemoryStorage()
+```
+
+### Constructor Parameters
+
+<ParamField path="session_table" type="str" default="None">
+  Name of the session table (for compatibility)
+</ParamField>
+
+<ParamField path="user_memory_table" type="str" default="None">
+  Name of the user memory table (for compatibility)
+</ParamField>
+
+<ParamField path="id" type="str" default="auto-generated">
+  Unique identifier for this storage instance
+</ParamField>
+
+### Use Cases
+
+- Development and testing
+- Temporary agent sessions
+- Scenarios where persistence is not required
+
+### Features
+
+- Zero configuration
+- Fast in-memory operations
+- Automatic cleanup on close
+
+---
+
+## JSONStorage
+
+JSON file storage implementation for simple file-based persistence.
+
+### Initialization
+
+```python
+from upsonic.storage.json import JSONStorage
+
+storage = JSONStorage(db_path="./agent_data")
+
+# Default (creates ./upsonic_json_db in current directory)
+storage = JSONStorage()
+```
+
+### Constructor Parameters
+
+<ParamField path="db_path" type="str" default="'./upsonic_json_db'">
+  Path to the directory where JSON files will be stored
+</ParamField>
+
+<ParamField path="session_table" type="str" default="'upsonic_sessions'">
+  Name of the JSON file for sessions (without .json extension)
+</ParamField>
+
+<ParamField path="user_memory_table" type="str" default="'upsonic_user_memories'">
+  Name of the JSON file for user memories
+</ParamField>
+
+<ParamField path="id" type="str" default="auto-generated">
+  Unique identifier for this storage instance
+</ParamField>
+
+### Directory Structure
+
+```
+db_path/
+    {session_table_name}.json
+    {user_memory_table_name}.json
+    cultural_knowledge.json
+```
+
+### Features
+
+- Human-readable JSON format
+- No database setup required
+- Simple file-based persistence
+- Automatic directory creation
+
+---
+
+## Common Storage Interface
+
+All storage backends implement the same interface:
+
+### Session Methods
+
+```python
+# Upsert operations
+storage.upsert_session(session, deserialize=True)
+storage.upsert_sessions(sessions, deserialize=True)
+
+# Get operations
+storage.get_session(session_id, session_type, user_id, agent_id, deserialize=True)
+storage.get_sessions(session_ids, session_type, user_id, agent_id, limit, offset, sort_by, sort_order, deserialize=True)
+
+# Delete operations
+storage.delete_session(session_id)
+storage.delete_sessions(session_ids)
+```
+
+### User Memory Methods
+
+```python
+# Upsert operations
+storage.upsert_user_memory(user_memory, deserialize=True)
+storage.upsert_user_memories(user_memories, deserialize=True)
+
+# Get operations
+storage.get_user_memory(user_id, agent_id, team_id, deserialize=True)
+storage.get_user_memories(user_ids, agent_id, team_id, limit, offset, deserialize=True)
+
+# Delete operations
+storage.delete_user_memory(user_id)
+storage.delete_user_memories(user_ids)
+```
+
+### Utility Methods
+
+```python
+# Table management
+storage.table_exists(table_name)
+storage._create_all_tables()
+
+# Cleanup
+storage.clear_all()
+storage.close()
+```
+
+## Choosing a Storage Backend
+
+### Development
+
+- **InMemoryStorage**: Fast, zero configuration, no persistence
+- **JSONStorage**: Simple file-based storage with readable format
+- **SqliteStorage**: Local database with full SQL capabilities
+
+### Production
+
+- **RedisStorage**: High performance, distributed caching, TTL support
+- **PostgresStorage**: Full SQL capabilities, JSONB support, ACID compliance
+- **MongoStorage**: Document-oriented, flexible schema, horizontal scaling
+
+### Installation Requirements
+
+```bash
+# Redis
+pip install "upsonic[redis-storage]"
+
+# PostgreSQL
+pip install "upsonic[postgres-storage]"
+
+# MongoDB
+pip install "upsonic[mongo-storage]"
+
+# SQLite (included with Python)
+pip install "upsonic[sqlite-storage]"
+
+# In-Memory and JSON (no extra dependencies)
+pip install upsonic
+```
+
+## Example: Switching Storage Backends
+
+```python
+from upsonic import Agent
+from upsonic.storage.memory import Memory
+
+# Development: In-Memory
+from upsonic.storage.in_memory import InMemoryStorage
+storage = InMemoryStorage()
+
+# Staging: PostgreSQL
+from upsonic.storage.postgres import PostgresStorage
+storage = PostgresStorage(db_url="postgresql://user:pass@localhost/db")
+
+# Production: Redis with TTL
+from upsonic.storage.redis import RedisStorage
+storage = RedisStorage(
+    db_url="redis://localhost:6379/0",
+    db_prefix="prod",
+    expire=86400
+)
+
+# Same Memory and Agent code works with all backends
+memory = Memory(storage=storage, full_session_memory=True)
+agent = Agent("openai/gpt-4o", memory=memory)
+```

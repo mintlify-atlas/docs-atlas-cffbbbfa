@@ -1,0 +1,288 @@
+---
+title: "Installation"
+description: "Install Upsonic with pip or uv and configure your environment"
+---
+
+## Install Upsonic
+
+Upsonic requires Python 3.10 or higher. You can install it using pip or uv (recommended).
+
+<CodeGroup>
+```bash pip
+pip install upsonic
+```
+
+```bash uv
+uv pip install upsonic
+```
+</CodeGroup>
+
+<Note>
+We recommend using [uv](https://github.com/astral-sh/uv) for faster dependency resolution and installation.
+</Note>
+
+## Environment Setup
+
+Upsonic supports multiple AI providers. Set up API keys for the providers you want to use:
+
+<CodeGroup>
+```bash OpenAI
+export OPENAI_API_KEY="sk-..."
+```
+
+```bash Anthropic
+export ANTHROPIC_API_KEY="sk-ant-..."
+```
+
+```bash Azure OpenAI
+export AZURE_OPENAI_API_KEY="..."
+export AZURE_OPENAI_ENDPOINT="https://..."
+```
+
+```bash AWS Bedrock
+export AWS_ACCESS_KEY_ID="..."
+export AWS_SECRET_ACCESS_KEY="..."
+export AWS_REGION="us-east-1"
+```
+</CodeGroup>
+
+<Tip>
+Create a `.env` file in your project directory to store API keys. Upsonic automatically loads environment variables from `.env` files.
+</Tip>
+
+### Example .env File
+
+```bash .env
+# OpenAI
+OPENAI_API_KEY=sk-...
+
+# Anthropic
+ANTHROPIC_API_KEY=sk-ant-...
+
+# Optional: Disable telemetry
+UPSONIC_TELEMETRY=false
+```
+
+## Optional Dependencies
+
+Upsonic provides optional dependencies for additional features. Install them based on your needs:
+
+### Storage Backends
+
+For persistent memory and session storage:
+
+<CodeGroup>
+```bash SQLite
+uv pip install "upsonic[sqlite-storage]"
+```
+
+```bash Redis
+uv pip install "upsonic[redis-storage]"
+```
+
+```bash PostgreSQL
+uv pip install "upsonic[postgres-storage]"
+```
+
+```bash MongoDB
+uv pip install "upsonic[mongo-storage]"
+```
+
+```bash All Storage
+uv pip install "upsonic[storage]"
+```
+</CodeGroup>
+
+### Vector Databases (for RAG/Knowledge Base)
+
+For knowledge base and retrieval-augmented generation:
+
+<CodeGroup>
+```bash ChromaDB
+uv pip install "upsonic[chroma]"
+```
+
+```bash Qdrant
+uv pip install "upsonic[qdrant]"
+```
+
+```bash Pinecone
+uv pip install "upsonic[pinecone]"
+```
+
+```bash FAISS
+uv pip install "upsonic[faiss]"
+```
+
+```bash All Vector DBs
+uv pip install "upsonic[vectordb]"
+```
+</CodeGroup>
+
+### Document Loaders
+
+For loading various document formats:
+
+<CodeGroup>
+```bash PDF Support
+uv pip install "upsonic[pdf-loader]"
+```
+
+```bash DOCX Support
+uv pip install "upsonic[docx-loader]"
+```
+
+```bash HTML Support
+uv pip install "upsonic[html-loader]"
+```
+
+```bash All Loaders
+uv pip install "upsonic[loaders]"
+```
+</CodeGroup>
+
+### OCR Engines
+
+For optical character recognition from images and PDFs:
+
+```bash
+uv pip install "upsonic[ocr]"
+```
+
+This includes EasyOCR, PaddleOCR, Tesseract, and RapidOCR engines.
+
+### Common Tools
+
+For pre-built tools like YFinance, Tavily, and DuckDuckGo:
+
+```bash
+uv pip install "upsonic[tools]"
+```
+
+### Safety Engine
+
+For advanced content filtering using ML models:
+
+```bash
+uv pip install "upsonic[safety-engine]"
+```
+
+### All Features
+
+To install everything (not recommended for production):
+
+```bash
+uv pip install "upsonic[storage,vectordb,loaders,ocr,tools,safety-engine]"
+```
+
+<Warning>
+Installing all features will download large dependencies (several GB). Only install what you need for your use case.
+</Warning>
+
+## Verify Installation
+
+Verify your installation by running a simple test:
+
+```python test.py
+from upsonic import Agent, Task
+
+# Test basic agent creation
+agent = Agent(model="openai/gpt-4o", name="Test Agent")
+print(f"Agent created: {agent.name}")
+print(f"Model: {agent.model.model_name}")
+print("Installation successful!")
+```
+
+Run the test:
+
+```bash
+python test.py
+```
+
+You should see:
+
+```
+Agent created: Test Agent
+Model: gpt-4o
+Installation successful!
+```
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Import Error: No module named 'upsonic'">
+    Make sure you installed Upsonic in the correct Python environment:
+    
+    ```bash
+    # Check Python version
+    python --version  # Should be 3.10+
+    
+    # Reinstall
+    pip install --upgrade upsonic
+    ```
+  </Accordion>
+  
+  <Accordion title="API Key Not Found">
+    Ensure your API keys are set correctly:
+    
+    ```python
+    import os
+    print(os.getenv("OPENAI_API_KEY"))  # Should not be None
+    ```
+    
+    If using a `.env` file, make sure it's in your project directory.
+  </Accordion>
+  
+  <Accordion title="Module Not Found for Optional Dependencies">
+    If you see errors like `ModuleNotFoundError: No module named 'chromadb'`, install the required optional dependency:
+    
+    ```bash
+    uv pip install "upsonic[chroma]"
+    ```
+  </Accordion>
+  
+  <Accordion title="Slow Installation with pip">
+    Use `uv` for faster installation:
+    
+    ```bash
+    # Install uv first
+    pip install uv
+    
+    # Then use uv to install Upsonic
+    uv pip install upsonic
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Development Installation
+
+For contributing to Upsonic or running from source:
+
+<Steps>
+  <Step title="Clone the repository">
+    ```bash
+    git clone https://github.com/Upsonic/Upsonic.git
+    cd Upsonic
+    ```
+  </Step>
+  
+  <Step title="Install with development dependencies">
+    ```bash
+    uv sync
+    ```
+  </Step>
+  
+  <Step title="Run tests">
+    ```bash
+    uv run pytest
+    ```
+  </Step>
+</Steps>
+
+## Next Steps
+
+Now that Upsonic is installed, let's build your first agent:
+
+<Card title="Quickstart Tutorial" icon="rocket" href="/quickstart">
+  Create your first agent and run a task in minutes
+</Card>

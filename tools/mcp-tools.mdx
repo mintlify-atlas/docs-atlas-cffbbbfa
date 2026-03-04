@@ -1,0 +1,240 @@
+---
+title: MCP tools
+description: Integrate Model Context Protocol servers with Upsonic agents
+---
+
+## Overview
+
+Upsonic provides seamless integration with [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) servers, allowing you to connect your agents to hundreds of existing MCP tools and services.
+
+MCP is an open protocol that standardizes how applications provide context to LLMs. With Upsonic's MCP integration, you can give your agents access to databases, APIs, file systems, and more through a unified interface.
+
+## Quick start
+
+Connect an MCP server to your agent:
+
+```python
+from upsonic import Agent, Task
+
+# Create agent with MCP server
+agent = Agent(
+    model="anthropic/claude-sonnet-4-5",
+    mcp_servers=[
+        {
+            "command": "npx",
+            "args": ["-y", "@modelcontextprotocol/server-filesystem", "/path/to/directory"]
+        }
+    ]
+)
+
+# The agent now has access to filesystem tools
+task = Task(description="List all Python files in the current directory")
+agent.print_do(task)
+```
+
+## Configuring MCP servers
+
+### Server configuration format
+
+Each MCP server is configured with a command and arguments:
+
+```python
+mcp_server_config = {
+    "command": "executable_name",  # The command to run
+    "args": ["arg1", "arg2"],      # Command arguments
+    "env": {                        # Optional environment variables
+        "API_KEY": "your-key"
+    }
+}
+```
+
+### Multiple MCP servers
+
+You can connect multiple MCP servers to a single agent:
+
+```python
+agent = Agent(
+    model="anthropic/claude-sonnet-4-5",
+    mcp_servers=[
+        # Filesystem access
+        {
+            "command": "npx",
+            "args": ["-y", "@modelcontextprotocol/server-filesystem", "/workspace"]
+        },
+        # GitHub integration
+        {
+            "command": "npx",
+            "args": ["-y", "@modelcontextprotocol/server-github"],
+            "env": {"GITHUB_TOKEN": "your_token"}
+        },
+        # PostgreSQL database
+        {
+            "command": "npx",
+            "args": ["-y", "@modelcontextprotocol/server-postgres"],
+            "env": {"DATABASE_URL": "postgresql://..."}
+        }
+    ]
+)
+```
+
+## Available MCP servers
+
+### Official MCP servers
+
+- **Filesystem** - Read and write files
+- **GitHub** - Repository management
+- **GitLab** - Repository operations
+- **Google Drive** - File access
+- **Google Maps** - Location services
+- **Postgres** - Database queries
+- **Slack** - Team communication
+- **Brave Search** - Web search
+- **Memory** - Persistent key-value storage
+
+### Community MCP servers
+
+Explore the [MCP servers directory](https://github.com/modelcontextprotocol/servers) for hundreds of community-built integrations.
+
+## Using FastMCP
+
+Upsonic also supports [FastMCP](https://github.com/jlowin/fastmcp) for creating MCP servers in Python:
+
+```python
+from fastmcp import FastMCP
+
+# Create MCP server
+mcp = FastMCP("My Custom Server")
+
+@mcp.tool()
+def calculate_revenue(sales: float, costs: float) -> float:
+    """Calculate net revenue from sales and costs."""
+    return sales - costs
+
+# Use with agent
+agent = Agent(
+    model="anthropic/claude-sonnet-4-5",
+    mcp_servers=[mcp]  # Pass FastMCP instance directly
+)
+
+task = Task(description="Calculate revenue with $10000 sales and $6000 costs")
+result = agent.do(task)
+```
+
+## Team MCP integration
+
+Expose an entire agent team as an MCP server:
+
+```python
+from upsonic import Agent, Team
+
+# Create specialized agents
+researcher = Agent(model="openai/gpt-4o", name="Researcher")
+analyst = Agent(model="anthropic/claude-sonnet-4-5", name="Analyst")
+writer = Agent(model="openai/gpt-4o", name="Writer")
+
+# Create team
+team = Team(
+    agents=[researcher, analyst, writer],
+    mode="sequential"
+)
+
+# Expose team as MCP server
+mcp_server = team.as_mcp(
+    name="ResearchTeam",
+    description="A team that researches, analyzes, and writes reports"
+)
+
+# Now other agents can use this team as a tool
+coordinator = Agent(
+    model="anthropic/claude-sonnet-4-5",
+    mcp_servers=[mcp_server]
+)
+```
+
+## Environment variables
+
+Configure MCP servers with environment variables:
+
+```python
+import os
+
+agent = Agent(
+    model="anthropic/claude-sonnet-4-5",
+    mcp_servers=[{
+        "command": "npx",
+        "args": ["-y", "@modelcontextprotocol/server-github"],
+        "env": {
+            "GITHUB_TOKEN": os.getenv("GITHUB_TOKEN"),
+            "GITHUB_ORG": "your-org"
+        }
+    }]
+)
+```
+
+Or use a `.env` file:
+
+```bash
+GITHUB_TOKEN=ghp_xxxxxxxxxxxxx
+DATABASE_URL=postgresql://user:pass@host/db
+SLACK_TOKEN=xoxb-xxxxxxxxxxxxx
+```
+
+## Troubleshooting
+
+### Server not starting
+
+Ensure the MCP server executable is available:
+
+```bash
+# Test the server command manually
+npx -y @modelcontextprotocol/server-filesystem /path
+```
+
+### Permission errors
+
+Check that the agent has necessary permissions:
+
+```python
+# For filesystem access, ensure the path is accessible
+mcp_servers=[{
+    "command": "npx",
+    "args": ["-y", "@modelcontextprotocol/server-filesystem", "/allowed/path"]
+}]
+```
+
+### Authentication failures
+
+Verify environment variables are set correctly:
+
+```python
+import os
+print(os.getenv("GITHUB_TOKEN"))  # Should not be None
+```
+
+## Best practices
+
+<Tip>
+**Start simple** - Begin with one MCP server and verify it works before adding more.
+</Tip>
+
+<Warning>
+**Security** - Be cautious with filesystem and database access. Use workspace sandboxing when possible.
+</Warning>
+
+<Note>
+**Performance** - Each MCP server adds startup overhead. Only include servers you actually need.
+</Note>
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Built-in tools" icon="toolbox" href="/tools/built-in-tools">
+    Explore Upsonic's native tool integrations
+  </Card>
+  <Card title="Custom tools" icon="wrench" href="/tools/custom-tools">
+    Create your own custom tools
+  </Card>
+  <Card title="Tool API reference" icon="code" href="/api/tools/base">
+    Complete tool system API documentation
+  </Card>
+</CardGroup>

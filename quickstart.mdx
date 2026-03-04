@@ -1,80 +1,409 @@
 ---
 title: "Quickstart"
-description: "Start building awesome documentation in minutes"
+description: "Build your first Upsonic agent in 5 minutes"
 ---
 
-## Get started in three steps
+## Your First Agent
 
-Get your documentation site running locally and make your first customization.
+Let's create a simple agent and execute your first task. This tutorial assumes you've already [installed Upsonic](/get-started/installation).
 
-### Step 1: Set up your local environment
-
-<AccordionGroup>
-  <Accordion icon="copy" title="Clone your docs locally">
-    During the onboarding process, you created a GitHub repository with your docs content if you didn't already have one. You can find a link to this repository in your [dashboard](https://dashboard.mintlify.com).
+<Steps>
+  <Step title="Import and create an agent">
+    Create a new Python file and import Upsonic:
     
-    To clone the repository locally so that you can make and preview changes to your docs, follow the [Cloning a repository](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository) guide in the GitHub docs.
-  </Accordion>
-  <Accordion icon="rectangle-terminal" title="Start the preview server">
-    1. Install the Mintlify CLI: `npm i -g mint`
-    2. Navigate to your docs directory and run: `mint dev`
-    3. Open `http://localhost:3000` to see your docs live!
+    ```python first_agent.py
+    from upsonic import Agent, Task
     
-    <Tip>Your preview updates automatically as you edit files.</Tip>
-  </Accordion>
-</AccordionGroup>
-
-### Step 2: Deploy your changes
-
-<AccordionGroup>
-  <Accordion icon="github" title="Install our GitHub app">
-    Install the Mintlify GitHub app from your [dashboard](https://dashboard.mintlify.com/settings/organization/github-app).
+    # Create an agent with Anthropic Claude
+    agent = Agent(
+        model="anthropic/claude-sonnet-4-5",
+        name="My First Agent"
+    )
+    ```
     
-    Our GitHub app automatically deploys your changes to your docs site, so you don't need to manage deployments yourself.
-</Accordion>
-<Accordion icon="palette" title="Update your site name and colors">
-    For a first change, let's update the name and colors of your docs site.
+    <Note>
+    The `model` parameter accepts provider/model format. Examples: `"openai/gpt-4o"`, `"anthropic/claude-sonnet-4-5"`, `"azure/gpt-4"`
+    </Note>
+  </Step>
+  
+  <Step title="Define a task">
+    Create a task describing what you want the agent to do:
+    
+    ```python
+    task = Task(description="Explain the difference between AI agents and chatbots in 3 sentences")
+    ```
+  </Step>
+  
+  <Step title="Execute the task">
+    Run the task and print the result:
+    
+    ```python
+    # Execute and print output
+    agent.print_do(task)
+    ```
+    
+    The agent will send the task to the model and display the response.
+  </Step>
+</Steps>
 
-    1. Open `docs.json` in your editor.
-    2. Change the `"name"` field to your project name.
-    3. Update the `"colors"` to match your brand.
-    4. Save and see your changes instantly at `http://localhost:3000`.
+### Complete Example
 
-    <Tip>Try changing the primary color to see an immediate difference!</Tip>
-  </Accordion>
-</AccordionGroup>
+```python first_agent.py
+from upsonic import Agent, Task
 
-### Step 3: Go live
+agent = Agent(
+    model="anthropic/claude-sonnet-4-5",
+    name="My First Agent"
+)
 
-<Accordion icon="rocket" title="Publish your docs">
-  1. Commit and push your changes.
-  2. Your docs will update and be live in moments!
-</Accordion>
+task = Task(description="Explain the difference between AI agents and chatbots in 3 sentences")
 
-## Next steps
+agent.print_do(task)
+```
 
-Now that you have your docs running, explore these key features:
+Run it:
 
-<CardGroup cols={2}>
+```bash
+python first_agent.py
+```
 
-<Card title="Write Content" icon="pen-to-square" href="/essentials/markdown">
-  Learn MDX syntax and start writing your documentation.
-</Card>
+## Agent with Tools
 
-<Card title="Customize style" icon="palette" href="/essentials/settings">
-  Make your docs match your brand perfectly.
-</Card>
+Let's enhance your agent with tools. Tools allow agents to perform actions beyond text generation.
 
-<Card title="Add code examples" icon="square-code" href="/essentials/code">
-  Include syntax-highlighted code blocks.
-</Card>
+### Using Built-in Tools
 
-<Card title="API documentation" icon="code" href="/api-reference/introduction">
-  Auto-generate API docs from OpenAPI specs.
-</Card>
+Upsonic provides pre-built tools for common tasks:
 
-</CardGroup>
+```python stock_agent.py
+from upsonic import Agent, Task
+from upsonic.tools.common_tools import YFinanceTools
+
+# Create agent with no tools at agent level
+agent = Agent(
+    model="anthropic/claude-sonnet-4-5",
+    name="Stock Analyst"
+)
+
+# Add tools at task level
+task = Task(
+    description="Give me a summary about Tesla stock (TSLA) with current price and recent performance",
+    tools=[YFinanceTools()]  # YFinance toolkit for stock data
+)
+
+agent.print_do(task)
+```
 
 <Note>
-  **Need help?** See our [full documentation](https://mintlify.com/docs) or join our [community](https://mintlify.com/community).
+The `YFinanceTools()` toolkit provides multiple tools for fetching stock data, company info, financial statements, and more.
 </Note>
+
+### Creating Custom Tools
+
+Create your own tools as simple Python functions:
+
+```python custom_tool.py
+from upsonic import Agent, Task
+
+def get_weather(city: str) -> str:
+    """Get the current weather for a city.
+    
+    Args:
+        city: Name of the city
+        
+    Returns:
+        Weather description
+    """
+    # In production, call a real weather API
+    return f"The weather in {city} is sunny and 72°F"
+
+agent = Agent(model="openai/gpt-4o")
+
+task = Task(
+    description="What's the weather in San Francisco and should I bring a jacket?",
+    tools=[get_weather]  # Pass function as tool
+)
+
+agent.print_do(task)
+```
+
+<Tip>
+Upsonic automatically generates tool schemas from your function signatures and docstrings. Use type hints and docstrings for best results.
+</Tip>
+
+## Agent with Memory
+
+Add memory to create agents that remember context across conversations:
+
+```python memory_agent.py
+from upsonic import Agent, Task
+from upsonic.storage import Memory, InMemoryStorage
+
+# Create memory with storage backend
+memory = Memory(
+    storage=InMemoryStorage(),
+    session_id="session_001",
+    full_session_memory=True  # Enable chat history
+)
+
+# Create agent with memory
+agent = Agent(
+    model="anthropic/claude-sonnet-4-5",
+    memory=memory
+)
+
+# First task: Agent learns user's name
+task1 = Task(description="My name is Alice and I love Python programming")
+agent.print_do(task1)
+
+print("\n" + "="*50 + "\n")
+
+# Second task: Agent remembers from previous conversation
+task2 = Task(description="What's my name and what do I love?")
+agent.print_do(task2)
+# Output: "Your name is Alice and you love Python programming"
+```
+
+<Info>
+Memory supports multiple storage backends: InMemoryStorage (default), SQLite, Redis, PostgreSQL, and MongoDB. See [Memory documentation](/concepts/memory) for details.
+</Info>
+
+## Autonomous Agent
+
+For tasks requiring filesystem and shell access, use `AutonomousAgent`:
+
+```python autonomous_agent.py
+from upsonic import AutonomousAgent, Task
+
+# Create autonomous agent with workspace
+agent = AutonomousAgent(
+    model="anthropic/claude-sonnet-4-5",
+    workspace="/path/to/project",  # All operations sandboxed to this directory
+    name="Code Assistant"
+)
+
+# Agent can read, write, and execute files
+task = Task(description="Read the README.md file and summarize the project")
+agent.print_do(task)
+
+# Or make code changes
+task2 = Task(description="Add error handling to the main.py file")
+agent.print_do(task2)
+```
+
+<Warning>
+AutonomousAgent restricts all file and shell operations to the specified `workspace` directory for security. Path traversal attacks are blocked automatically.
+</Warning>
+
+### Built-in Capabilities
+
+AutonomousAgent includes:
+- **Filesystem tools**: read, write, edit, search, list, move, copy, delete files
+- **Shell tools**: execute terminal commands with timeout and output capture
+- **Automatic memory**: Session persistence enabled by default
+- **Workspace sandboxing**: All operations restricted to workspace path
+
+## Execution Modes
+
+Upsonic provides multiple ways to execute tasks:
+
+<CodeGroup>
+```python Synchronous with Print
+# Print output directly (recommended for CLI/scripts)
+agent.print_do(task)
+```
+
+```python Synchronous with Return
+# Get result as string
+result = agent.do(task)
+print(result)
+```
+
+```python Asynchronous
+# For async applications
+import asyncio
+
+async def main():
+    result = await agent.do_async(task)
+    print(result)
+
+asyncio.run(main())
+```
+
+```python Streaming
+# Stream response chunks
+for chunk in agent.stream(task):
+    print(chunk, end="", flush=True)
+```
+</CodeGroup>
+
+## Response Formats
+
+Control the output format with `response_format`:
+
+### Structured Output
+
+```python structured_output.py
+from upsonic import Agent, Task
+from pydantic import BaseModel
+
+class MovieReview(BaseModel):
+    title: str
+    rating: int  # 1-10
+    summary: str
+    recommended: bool
+
+agent = Agent(model="openai/gpt-4o")
+
+task = Task(
+    description="Review the movie Inception",
+    response_format=MovieReview  # Enforce structured output
+)
+
+result = agent.do(task, return_output=True)
+review = result.output  # MovieReview instance
+
+print(f"Title: {review.title}")
+print(f"Rating: {review.rating}/10")
+print(f"Summary: {review.summary}")
+print(f"Recommended: {review.recommended}")
+```
+
+<Tip>
+Structured outputs use JSON schema mode to ensure the model returns valid data matching your Pydantic model.
+</Tip>
+
+## Working with Files
+
+Agents can process images and documents as attachments:
+
+```python file_processing.py
+from upsonic import Agent, Task
+
+agent = Agent(model="anthropic/claude-sonnet-4-5")
+
+# Process an image
+task = Task(
+    description="Describe what you see in this image",
+    attachments=["screenshot.png"]  # Path to image file
+)
+
+agent.print_do(task)
+
+# Process a PDF document
+task2 = Task(
+    description="Summarize this document",
+    attachments=["report.pdf"]
+)
+
+agent.print_do(task2)
+```
+
+<Info>
+Upsonic automatically detects file types and processes them appropriately. Images are sent directly to vision-capable models, while documents are extracted and added to context.
+</Info>
+
+## Error Handling
+
+Handle errors gracefully with try-except blocks:
+
+```python error_handling.py
+from upsonic import Agent, Task
+from upsonic.exceptions import UpsonicException
+
+agent = Agent(model="openai/gpt-4o")
+
+try:
+    task = Task(description="Analyze this data")
+    result = agent.do(task)
+    print(result)
+    
+except UpsonicException as e:
+    print(f"Agent error: {e}")
+    
+except Exception as e:
+    print(f"Unexpected error: {e}")
+```
+
+## Next Steps
+
+You've learned the basics of Upsonic! Here's what to explore next:
+
+<CardGroup cols={2}>
+  <Card title="Core Concepts" icon="book" href="/concepts/agent">
+    Deep dive into agents, tasks, and tools
+  </Card>
+  
+  <Card title="Safety Engine" icon="shield" href="/concepts/safety-engine">
+    Add content filtering and policy enforcement
+  </Card>
+  
+  <Card title="Multi-Agent Teams" icon="users" href="/concepts/team">
+    Coordinate multiple agents for complex workflows
+  </Card>
+  
+  <Card title="Knowledge Base" icon="database" href="/concepts/knowledge-base">
+    Add RAG capabilities to your agents
+  </Card>
+  
+  <Card title="API Reference" icon="code" href="/api/agent">
+    Complete API documentation
+  </Card>
+  
+  <Card title="Building Agents" icon="flask" href="/guides/building-agents">
+    Best practices and patterns
+  </Card>
+</CardGroup>
+
+## Common Patterns
+
+### Agent with Multiple Tools
+
+```python
+from upsonic import Agent, Task
+from upsonic.tools.common_tools import YFinanceTools, tavily_search_tool
+
+agent = Agent(
+    model="anthropic/claude-sonnet-4-5",
+    tools=[YFinanceTools(), tavily_search_tool]  # Multiple tools
+)
+
+task = Task(
+    description="Research Tesla's latest news and stock performance"
+)
+
+agent.print_do(task)
+```
+
+### Agent with Safety Policies
+
+```python
+from upsonic import Agent, Task
+from upsonic.safety_engine.policies.pii_policies import PIIAnonymizePolicy
+
+agent = Agent(
+    model="openai/gpt-4o",
+    user_policy=PIIAnonymizePolicy  # Anonymize PII before sending to LLM
+)
+
+task = Task(
+    description="My email is john@example.com and phone is 555-1234. What are they?"
+)
+
+result = agent.do(task)
+print(result)  # PII is anonymized in LLM, then restored in response
+```
+
+### Debug Mode
+
+```python
+agent = Agent(
+    model="openai/gpt-4o",
+    debug=True,  # Enable debug logging
+    debug_level=2  # Detailed logs (1=standard, 2=detailed)
+)
+```
+
+<Tip>
+Enable debug mode during development to see detailed logs of model requests, tool calls, and policy checks.
+</Tip>

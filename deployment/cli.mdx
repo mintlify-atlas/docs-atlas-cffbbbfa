@@ -1,0 +1,419 @@
+---
+title: CLI Commands
+description: Command-line interface for managing Upsonic agents and deployments
+---
+
+The Upsonic CLI provides a complete set of commands for initializing, managing, and deploying AI agent projects. All commands are optimized for speed with lazy imports and O(1) command dispatch.
+
+## Installation
+
+The CLI is included with the Upsonic package:
+
+```bash
+uv pip install upsonic
+```
+
+## Command Overview
+
+The Upsonic CLI supports the following commands:
+
+- `init` - Initialize a new agent project
+- `add` - Add dependencies to your project
+- `remove` - Remove dependencies from your project
+- `install` - Install project dependencies
+- `run` - Run the agent as a FastAPI server
+- `zip` - Create a deployment package
+
+## Commands
+
+### init
+
+Initialize a new Upsonic agent project with configuration and entry point files.
+
+```bash
+upsonic init
+```
+
+**What it creates:**
+
+1. **main.py** - Main agent entry point:
+```python
+from upsonic import Task, Agent
+
+async def main(inputs):
+    user_query = inputs.get("user_query")
+    answering_task = Task(f"Answer the user question {user_query}")
+    agent = Agent()
+    result = await agent.print_do_async(answering_task)
+    return {
+        "bot_response": result
+    }
+```
+
+2. **upsonic_configs.json** - Project configuration with:
+   - Environment variables (workers, concurrency)
+   - Machine specifications (CPU, memory, storage)
+   - Agent metadata (name, description, icon)
+   - Dependencies by section (api, streamlit, development)
+   - Entrypoints (api_file, streamlit_file)
+   - Input/output schemas
+
+**Options:**
+- `--help`, `-h` - Show help message
+
+**Example:**
+```bash
+upsonic init
+# Prompts for agent name
+# Creates main.py and upsonic_configs.json
+```
+
+---
+
+### add
+
+Add a library dependency to your project configuration.
+
+```bash
+upsonic add <library> <section>
+```
+
+**Arguments:**
+- `library` - Library name with optional version (e.g., `requests==2.31.0`)
+- `section` - Dependency section: `api`, `streamlit`, or `development`
+
+**Options:**
+- `--help`, `-h` - Show help message
+
+**Examples:**
+```bash
+# Add a library to API dependencies
+upsonic add x_library==0.52.0 api
+
+# Add a development dependency
+upsonic add pytest development
+
+# Add a streamlit dependency
+upsonic add plotly streamlit
+```
+
+**Configuration sections:**
+- `api` - Core API dependencies (FastAPI, uvicorn, celery, etc.)
+- `streamlit` - Streamlit UI dependencies
+- `development` - Development and testing tools
+
+---
+
+### remove
+
+Remove a library dependency from your project configuration.
+
+```bash
+upsonic remove <library> <section>
+```
+
+**Arguments:**
+- `library` - Library name (supports package name matching)
+- `section` - Dependency section: `api`, `streamlit`, or `development`
+
+**Options:**
+- `--help`, `-h` - Show help message
+
+**Examples:**
+```bash
+# Remove by exact name
+upsonic remove requests api
+
+# Remove by package name (matches version specifiers)
+upsonic remove fastapi api
+```
+
+**Matching behavior:**
+- First tries exact string match (case-insensitive)
+- Falls back to package name matching (ignores version specifiers)
+- Handles complex dependency strings like `upsonic[storage]>=1.0.0`
+
+---
+
+### install
+
+Install project dependencies from `upsonic_configs.json`.
+
+```bash
+upsonic install [section]
+```
+
+**Arguments:**
+- `section` - Optional section to install (default: `api`)
+  - `api` - Install API dependencies only
+  - `all` - Install all sections
+  - `streamlit` - Install streamlit dependencies
+  - `development` - Install development dependencies
+
+**Options:**
+- `--help`, `-h` - Show help message
+
+**Examples:**
+```bash
+# Install API dependencies (default)
+upsonic install
+
+# Install all dependencies
+upsonic install all
+
+# Install specific section
+upsonic install development
+```
+
+**What it does:**
+- Reads dependencies from `upsonic_configs.json`
+- Uses pip to install packages
+- Validates section names before installation
+
+---
+
+### run
+
+Run the agent as a FastAPI server or InterfaceManager server.
+
+```bash
+upsonic run [--host HOST] [--port PORT]
+```
+
+**Options:**
+- `--host` - Server host (default: `0.0.0.0`)
+- `--port` - Server port (default: `8000`)
+- `--help`, `-h` - Show help message
+
+**Examples:**
+```bash
+# Run with defaults (0.0.0.0:8000)
+upsonic run
+
+# Run on specific host and port
+upsonic run --host 127.0.0.1 --port 3000
+
+# Run on custom port
+upsonic run --port 5000
+```
+
+**Server modes:**
+
+1. **Standard API Mode:**
+   - Loads the entrypoint file specified in `upsonic_configs.json`
+   - Creates a FastAPI app with `/call` endpoint
+   - Generates OpenAPI documentation at `/docs`
+   - Accepts both JSON and multipart/form-data requests
+
+2. **Interface Mode:**
+   - Detects if `main()` returns an `InterfaceManager`
+   - Starts the interface server (Slack, Gmail, Telegram, WhatsApp)
+   - Handles webhook routing and authentication
+
+**API Endpoint:**
+
+```bash
+# POST /call - Main endpoint
+curl -X POST http://localhost:8000/call \
+  -H "Content-Type: application/json" \
+  -d '{"user_query": "What is AI?"}'
+```
+
+**OpenAPI Documentation:**
+- Available at `http://localhost:8000/docs`
+- Interactive API testing interface
+- Auto-generated from input/output schemas
+
+---
+
+### zip
+
+Create a deployment package containing all project files.
+
+```bash
+upsonic zip [output_file]
+```
+
+**Arguments:**
+- `output_file` - Optional output filename (default: `upsonic_context_<timestamp>.zip`)
+
+**Options:**
+- `--help`, `-h` - Show help message
+
+**Examples:**
+```bash
+# Create zip with auto-generated name
+upsonic zip
+# Creates: upsonic_context_20260304_143022.zip
+
+# Create zip with custom name
+upsonic zip my-agent-v1.zip
+
+# Custom name without extension
+upsonic zip deployment
+# Creates: deployment.zip
+```
+
+**What it includes:**
+- All project files in the current directory
+- Configuration files (`upsonic_configs.json`)
+- Source code (`main.py`, modules)
+- Dependencies manifest
+- Recursively includes subdirectories
+
+**What it excludes:**
+- The output zip file itself
+- Files that can't be read (permission errors)
+
+**Output information:**
+- Number of files included
+- Total uncompressed size
+- Final archive size
+- Compression ratio
+
+---
+
+## Global Options
+
+All commands support:
+- `--help`, `-h` - Show command-specific help
+
+## Configuration File
+
+The `upsonic_configs.json` file structure:
+
+```json
+{
+  "agent_name": "My Agent",
+  "description": "Agent description",
+  "icon": "book",
+  "streamlit": false,
+  "proxy_agent": false,
+  "envinroment_variables": {
+    "UPSONIC_WORKERS_AMOUNT": {
+      "type": "number",
+      "description": "Number of workers",
+      "default": 1
+    }
+  },
+  "machine_spec": {
+    "cpu": 2,
+    "memory": 4096,
+    "storage": 1024
+  },
+  "dependencies": {
+    "api": [
+      "fastapi>=0.115.12",
+      "uvicorn>=0.34.2",
+      "upsonic"
+    ],
+    "streamlit": [
+      "streamlit==1.32.2"
+    ],
+    "development": [
+      "pytest",
+      "ipdb"
+    ]
+  },
+  "entrypoints": {
+    "api_file": "main.py",
+    "streamlit_file": "streamlit_app.py"
+  },
+  "input_schema": {
+    "inputs": {
+      "user_query": {
+        "type": "string",
+        "description": "User's input question",
+        "required": true
+      }
+    }
+  },
+  "output_schema": {
+    "bot_response": {
+      "type": "string",
+      "description": "Agent's response"
+    }
+  }
+}
+```
+
+## Environment Variables
+
+Common environment variables:
+
+```bash
+# API Configuration
+UPSONIC_WORKERS_AMOUNT=1
+API_WORKERS=1
+RUNNER_CONCURRENCY=1
+
+# AI Provider Keys
+OPENAI_API_KEY=sk-...
+ANTHROPIC_API_KEY=sk-ant-...
+
+# Storage
+REDIS_URL=redis://localhost:6379
+POSTGRES_URL=postgresql://user:pass@localhost/db
+```
+
+## Workflow Example
+
+```bash
+# 1. Create new project
+upsonic init
+# Enter agent name: "Customer Support Agent"
+
+# 2. Add dependencies
+upsonic add langchain api
+upsonic add pytest development
+
+# 3. Install dependencies
+upsonic install all
+
+# 4. Run locally for testing
+upsonic run --port 8000
+
+# 5. Create deployment package
+upsonic zip customer-support-v1.zip
+```
+
+## Troubleshooting
+
+**Config file not found:**
+```bash
+# Make sure you're in the project directory
+ls upsonic_configs.json
+
+# Or run init to create one
+upsonic init
+```
+
+**Invalid JSON in config:**
+```bash
+# Validate your JSON
+python -m json.tool upsonic_configs.json
+```
+
+**Import errors when running:**
+```bash
+# Install missing dependencies
+upsonic install all
+
+# Check Python path
+echo $PYTHONPATH
+```
+
+**Port already in use:**
+```bash
+# Use a different port
+upsonic run --port 8001
+
+# Or kill the process using the port
+lsof -ti:8000 | xargs kill
+```
+
+## Next Steps
+
+- Deploy your agent: [AgentOS Documentation](/deployment/agentos)
+- Add interfaces: [Interface Integration](/deployment/interfaces)
+- Configure production settings: [Production Deployment](/deployment/production)

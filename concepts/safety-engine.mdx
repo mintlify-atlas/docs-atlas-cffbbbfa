@@ -1,0 +1,595 @@
+---
+title: "Safety Engine"
+description: "Safety policies, content filtering, and PII protection for production AI agents"
+---
+
+## Overview
+
+The Safety Engine provides comprehensive content filtering and policy enforcement for AI agents. It enables you to protect against harmful content, filter sensitive information, enforce business rules, and ensure compliance with data protection regulations.
+
+## Key Features
+
+- **Policy-Based Architecture**: Combine rules and actions into reusable policies
+- **Multiple Detection Methods**: Regex, ML models, and LLM-based detection
+- **Content Filtering**: Adult content, profanity, crypto, social media
+- **PII Protection**: Detect and anonymize personal information
+- **Financial Data**: Credit cards, bank accounts, SSN protection
+- **Medical/Legal**: HIPAA and legal information filtering
+- **Cybersecurity**: Malware, phishing, insider threat detection
+- **Tool Safety**: Harmful tool blocking and validation
+- **Feedback Loops**: Re-execution with policy feedback instead of blocking
+
+## Policy Architecture
+
+Policies combine **Rules** (detection) with **Actions** (response):
+
+```
+Policy = Rule + Action
+```
+
+- **Rule**: Detects violations (returns found items and severity)
+- **Action**: Determines response (block, anonymize, replace, raise exception)
+
+## Basic Usage
+
+### User Input Filtering
+
+```python
+from upsonic import Agent, Task
+from upsonic.safety_engine import PIIBlockPolicy
+
+# Block PII in user input
+agent = Agent(
+    model="openai/gpt-4o",
+    user_policy=PIIBlockPolicy()
+)
+
+# Input with PII is blocked
+task = Task("My SSN is 123-45-6789")
+result = agent.do(task)
+# Result: Blocked due to PII
+```
+
+### Agent Output Filtering
+
+```python
+from upsonic.safety_engine import AdultContentBlockPolicy
+
+# Filter agent output
+agent = Agent(
+    model="openai/gpt-4o",
+    agent_policy=AdultContentBlockPolicy()
+)
+
+# Output with adult content is blocked
+```
+
+### Multiple Policies
+
+```python
+from upsonic.safety_engine import (
+    PIIBlockPolicy,
+    ProfanityBlockPolicy,
+    AdultContentBlockPolicy
+)
+
+agent = Agent(
+    model="openai/gpt-4o",
+    user_policy=[PIIBlockPolicy(), ProfanityBlockPolicy()],
+    agent_policy=[AdultContentBlockPolicy()]
+)
+```
+
+## Policy Types
+
+### Input Policies (user_policy)
+
+Applied to user input before sending to the model:
+
+```python
+agent = Agent(
+    model="openai/gpt-4o",
+    user_policy=PIIBlockPolicy()  # Validates user input
+)
+```
+
+### Output Policies (agent_policy)
+
+Applied to agent output before returning to user:
+
+```python
+agent = Agent(
+    model="openai/gpt-4o",
+    agent_policy=AdultContentBlockPolicy()  # Filters agent output
+)
+```
+
+### Tool Policies
+
+Validate tool usage and results:
+
+```python
+from upsonic.safety_engine import HarmfulToolBlockPolicy
+
+agent = Agent(
+    model="openai/gpt-4o",
+    tools=[database_tool, file_tool],
+    tool_policy_pre=HarmfulToolBlockPolicy(),  # Before tool execution
+    tool_policy_post=ContentFilterPolicy()     # After tool execution
+)
+```
+
+## PII Protection
+
+### Blocking PII
+
+```python
+from upsonic.safety_engine import PIIBlockPolicy
+
+agent = Agent(
+    model="openai/gpt-4o",
+    user_policy=PIIBlockPolicy()
+)
+
+# Blocks: SSN, credit cards, emails, phone numbers, etc.
+```
+
+### Anonymizing PII
+
+Replace PII with placeholders:
+
+```python
+from upsonic.safety_engine import PIIAnonymizePolicy
+
+agent = Agent(
+    model="openai/gpt-4o",
+    user_policy=PIIAnonymizePolicy()
+)
+
+task = Task("My email is alice@example.com and phone is 555-1234")
+result = agent.do(task)
+# Input sent to model: "My email is [EMAIL] and phone is [PHONE]"
+# Response de-anonymized before returning to user
+```
+
+### Raising Exceptions
+
+```python
+from upsonic.safety_engine import PIIRaiseExceptionPolicy
+
+try:
+    agent = Agent(
+        model="openai/gpt-4o",
+        user_policy=PIIRaiseExceptionPolicy()
+    )
+    result = agent.do(Task("SSN: 123-45-6789"))
+except DisallowedOperation as e:
+    print(f"Policy violation: {e}")
+```
+
+### LLM-Based PII Detection
+
+More accurate detection using LLMs:
+
+```python
+from upsonic.safety_engine import PIIBlockPolicy_LLM
+
+agent = Agent(
+    model="openai/gpt-4o",
+    user_policy=PIIBlockPolicy_LLM(
+        base_model="openai/gpt-4o-mini"  # Model for detection
+    )
+)
+```
+
+## Content Filtering
+
+### Adult Content
+
+```python
+from upsonic.safety_engine import (
+    AdultContentBlockPolicy,
+    AdultContentBlockPolicy_LLM,
+    AdultContentRaiseExceptionPolicy
+)
+
+# Regex-based detection
+agent = Agent(
+    model="openai/gpt-4o",
+    agent_policy=AdultContentBlockPolicy()
+)
+
+# LLM-based detection (more accurate)
+agent = Agent(
+    model="openai/gpt-4o",
+    agent_policy=AdultContentBlockPolicy_LLM(
+        base_model="openai/gpt-4o-mini"
+    )
+)
+```
+
+### Profanity Filtering
+
+```python
+from upsonic.safety_engine import (
+    ProfanityBlockPolicy,
+    ProfanityBlockPolicy_Multilingual,
+    ProfanityBlockPolicy_GPU
+)
+
+# CPU-based detection
+agent = Agent(
+    model="openai/gpt-4o",
+    user_policy=ProfanityBlockPolicy()
+)
+
+# GPU-accelerated detection
+agent = Agent(
+    model="openai/gpt-4o",
+    user_policy=ProfanityBlockPolicy_GPU()
+)
+
+# Multilingual support
+agent = Agent(
+    model="openai/gpt-4o",
+    user_policy=ProfanityBlockPolicy_Multilingual()
+)
+```
+
+### Cryptocurrency Content
+
+```python
+from upsonic.safety_engine import (
+    CryptoBlockPolicy,
+    CryptoReplace,
+    CryptoRaiseExceptionPolicy
+)
+
+# Block crypto-related content
+agent = Agent(
+    model="openai/gpt-4o",
+    agent_policy=CryptoBlockPolicy()
+)
+
+# Replace crypto references
+agent = Agent(
+    model="openai/gpt-4o",
+    user_policy=CryptoReplace()
+)
+```
+
+### Social Media Content
+
+```python
+from upsonic.safety_engine import (
+    SensitiveSocialBlockPolicy,
+    SensitiveSocialRaiseExceptionPolicy
+)
+
+agent = Agent(
+    model="openai/gpt-4o",
+    user_policy=SensitiveSocialBlockPolicy()
+)
+```
+
+## Financial Data Protection
+
+```python
+from upsonic.safety_engine import (
+    FinancialInfoBlockPolicy,
+    FinancialInfoAnonymizePolicy,
+    FinancialInfoReplacePolicy
+)
+
+# Block credit cards, bank accounts, SSNs
+agent = Agent(
+    model="openai/gpt-4o",
+    user_policy=FinancialInfoBlockPolicy()
+)
+
+# Anonymize financial data
+agent = Agent(
+    model="openai/gpt-4o",
+    user_policy=FinancialInfoAnonymizePolicy()
+)
+```
+
+## Medical Information (HIPAA)
+
+```python
+from upsonic.safety_engine import (
+    MedicalInfoBlockPolicy,
+    MedicalInfoAnonymizePolicy,
+    MedicalInfoRaiseExceptionPolicy
+)
+
+agent = Agent(
+    model="openai/gpt-4o",
+    user_policy=MedicalInfoBlockPolicy()
+)
+```
+
+## Legal Information
+
+```python
+from upsonic.safety_engine import (
+    LegalInfoBlockPolicy,
+    LegalInfoAnonymizePolicy
+)
+
+agent = Agent(
+    model="openai/gpt-4o",
+    user_policy=LegalInfoBlockPolicy()
+)
+```
+
+## Cybersecurity Policies
+
+### Technical Security
+
+```python
+from upsonic.safety_engine import (
+    TechnicalSecurityBlockPolicy,
+    CybersecurityBlockPolicy
+)
+
+# Block API keys, passwords, tokens
+agent = Agent(
+    model="openai/gpt-4o",
+    user_policy=TechnicalSecurityBlockPolicy()
+)
+
+# Cybersecurity threat detection
+agent = Agent(
+    model="openai/gpt-4o",
+    user_policy=CybersecurityBlockPolicy()
+)
+```
+
+### Fraud Detection
+
+```python
+from upsonic.safety_engine import (
+    FraudDetectionBlockPolicy,
+    PhishingBlockPolicy,
+    InsiderThreatBlockPolicy
+)
+
+agent = Agent(
+    model="openai/gpt-4o",
+    user_policy=[
+        FraudDetectionBlockPolicy(),
+        PhishingBlockPolicy(),
+        InsiderThreatBlockPolicy()
+    ]
+)
+```
+
+## Tool Safety
+
+### Harmful Tool Detection
+
+```python
+from upsonic.safety_engine import (
+    HarmfulToolBlockPolicy,
+    MaliciousToolCallBlockPolicy
+)
+
+agent = Agent(
+    model="openai/gpt-4o",
+    tools=[database_tool, file_tool],
+    tool_policy_pre=HarmfulToolBlockPolicy()  # Before execution
+)
+```
+
+## Policy Feedback Loops
+
+Instead of blocking, provide feedback and re-execute:
+
+```python
+from upsonic.safety_engine import PIIBlockPolicy
+
+# Feedback mode: Don't block, provide helpful feedback
+agent = Agent(
+    model="openai/gpt-4o",
+    user_policy=PIIBlockPolicy(),
+    user_policy_feedback=True,  # Enable feedback loop
+    user_policy_feedback_loop=3  # Max retry attempts
+)
+
+# User input with PII triggers feedback message
+# Agent receives: "User input contained PII. Please reformulate without sensitive information."
+# Agent can respond helpfully instead of being blocked
+```
+
+### Agent Output Feedback
+
+```python
+agent = Agent(
+    model="openai/gpt-4o",
+    agent_policy=AdultContentBlockPolicy(),
+    agent_policy_feedback=True,  # Re-execute with feedback
+    agent_policy_feedback_loop=2
+)
+
+# If agent output violates policy:
+# 1. Violation detected
+# 2. Agent re-executes with feedback about the violation
+# 3. Agent tries again with corrected output
+```
+
+## Anonymization
+
+### Manual Anonymization
+
+```python
+from upsonic.safety_engine import anonymize_content, deanonymize_content
+
+# Anonymize
+result = anonymize_content(
+    "My email is alice@example.com and SSN is 123-45-6789",
+    pii_types=["email", "ssn"]
+)
+
+print(result.anonymized_text)  # "My email is [EMAIL_1] and SSN is [SSN_1]"
+print(result.anonymization_map)  # Mapping for de-anonymization
+
+# De-anonymize
+original = deanonymize_content(
+    result.anonymized_text,
+    result.anonymization_map
+)
+print(original)  # Original text restored
+```
+
+### Batch Anonymization
+
+```python
+from upsonic.safety_engine import anonymize_contents, deanonymize_contents
+
+texts = [
+    "Email: alice@example.com",
+    "Phone: 555-1234",
+    "SSN: 123-45-6789"
+]
+
+result = anonymize_contents(texts, pii_types=["email", "phone", "ssn"])
+
+for anon_text in result.anonymized_texts:
+    print(anon_text)
+
+# De-anonymize all
+originals = deanonymize_contents(
+    result.anonymized_texts,
+    result.anonymization_map
+)
+```
+
+## Creating Custom Policies
+
+### Custom Rule
+
+```python
+from upsonic.safety_engine.base import RuleBase
+from upsonic.safety_engine.models import RuleInput, RuleOutput
+
+class CustomRule(RuleBase):
+    def __init__(self):
+        super().__init__(
+            name="custom_rule",
+            description="Detects custom patterns"
+        )
+    
+    def process(self, input_data: RuleInput) -> RuleOutput:
+        text = input_data.input_text
+        
+        # Custom detection logic
+        found_items = []
+        if "restricted_word" in text.lower():
+            found_items.append("restricted_word")
+        
+        return RuleOutput(
+            found_items=found_items,
+            severity="high" if found_items else "none"
+        )
+```
+
+### Custom Action
+
+```python
+from upsonic.safety_engine.base import ActionBase
+from upsonic.safety_engine.models import ActionResult
+
+class CustomAction(ActionBase):
+    def __init__(self):
+        super().__init__(
+            name="custom_action",
+            description="Custom response to violations"
+        )
+    
+    def execute_action(
+        self,
+        rule_output: RuleOutput,
+        input_texts: List[str],
+        language: str,
+        *args
+    ) -> ActionResult:
+        if rule_output.found_items:
+            return ActionResult(
+                should_block=True,
+                message="Custom violation detected"
+            )
+        
+        return ActionResult(should_block=False)
+```
+
+### Custom Policy
+
+```python
+from upsonic.safety_engine.base import Policy
+
+custom_policy = Policy(
+    name="custom_policy",
+    description="My custom policy",
+    rule=CustomRule(),
+    action=CustomAction()
+)
+
+agent = Agent(
+    model="openai/gpt-4o",
+    user_policy=custom_policy
+)
+```
+
+## Complete Example
+
+```python
+from upsonic import Agent, Task
+from upsonic.safety_engine import (
+    PIIAnonymizePolicy,
+    ProfanityBlockPolicy,
+    AdultContentBlockPolicy_LLM,
+    FinancialInfoBlockPolicy,
+    HarmfulToolBlockPolicy
+)
+
+# Create production-ready agent with comprehensive safety
+agent = Agent(
+    model="openai/gpt-4o",
+    name="SecureAssistant",
+    
+    # User input policies
+    user_policy=[
+        PIIAnonymizePolicy(),           # Anonymize PII
+        ProfanityBlockPolicy(),         # Block profanity
+        FinancialInfoBlockPolicy(),     # Block financial data
+    ],
+    
+    # Agent output policies
+    agent_policy=[
+        AdultContentBlockPolicy_LLM(    # Filter adult content
+            base_model="openai/gpt-4o-mini"
+        )
+    ],
+    
+    # Tool policies
+    tool_policy_pre=HarmfulToolBlockPolicy(),
+    
+    # Enable feedback loops
+    user_policy_feedback=True,
+    agent_policy_feedback=True,
+    user_policy_feedback_loop=3,
+    agent_policy_feedback_loop=2,
+    
+    debug=True
+)
+
+# Safe execution with comprehensive filtering
+result = agent.do(Task("Help me with this request"))
+```
+
+## See Also
+
+- [Agent](/concepts/agent) - Integrating policies with agents
+- [Tools](/concepts/tools) - Tool safety policies
+- [Production Guide](/guides/production) - Production deployment best practices

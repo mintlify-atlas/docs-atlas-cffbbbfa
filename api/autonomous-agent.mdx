@@ -1,0 +1,519 @@
+---
+title: AutonomousAgent
+description: API reference for AutonomousAgent - a pre-configured agent with filesystem and shell capabilities
+---
+
+## Overview
+
+AutonomousAgent is a specialized Agent that comes pre-configured with filesystem and shell tools, making it ideal for coding assistants, DevOps automation, and system administration tasks. It inherits all capabilities from the base Agent class while adding workspace sandboxing and built-in tooling.
+
+## Class Definition
+
+```python
+from upsonic import AutonomousAgent
+
+agent = AutonomousAgent(
+    model="openai/gpt-4o",
+    workspace="/path/to/project"
+)
+```
+
+## Constructor Parameters
+
+### Core Parameters
+
+<ParamField path="model" type="Union[str, Model]" default="openai/gpt-4o">
+  Model identifier or Model instance
+</ParamField>
+
+<ParamField path="workspace" type="str" default="None">
+  Workspace directory path. All file and shell operations are restricted to this directory. Defaults to current working directory if not specified.
+</ParamField>
+
+<ParamField path="name" type="str" default="None">
+  Agent name for identification
+</ParamField>
+
+### Storage & Memory
+
+<ParamField path="storage" type="Storage" default="None">
+  Custom storage backend. If None, InMemoryStorage is created automatically.
+</ParamField>
+
+<ParamField path="memory" type="Memory" default="None">
+  Custom Memory instance. If None, Memory is created with storage.
+</ParamField>
+
+<ParamField path="db" type="DatabaseBase" default="None">
+  Database instance (overrides memory if provided)
+</ParamField>
+
+<ParamField path="full_session_memory" type="bool" default="True">
+  Enable chat history persistence
+</ParamField>
+
+<ParamField path="summary_memory" type="bool" default="False">
+  Enable session summary generation
+</ParamField>
+
+<ParamField path="user_analysis_memory" type="bool" default="False">
+  Enable user profile extraction
+</ParamField>
+
+### Toolkit Configuration
+
+<ParamField path="enable_filesystem" type="bool" default="True">
+  Enable filesystem tools (read, write, edit, list, search, etc.)
+</ParamField>
+
+<ParamField path="enable_shell" type="bool" default="True">
+  Enable shell command execution tools
+</ParamField>
+
+<ParamField path="shell_timeout" type="int" default="120">
+  Default timeout for shell commands in seconds
+</ParamField>
+
+<ParamField path="shell_max_output" type="int" default="10000">
+  Maximum output length before truncation
+</ParamField>
+
+<ParamField path="blocked_commands" type="List[str]" default="None">
+  List of command patterns to block for security (e.g., ["rm -rf /", "sudo"])
+</ParamField>
+
+### Heartbeat Configuration
+
+<ParamField path="heartbeat" type="bool" default="False">
+  Enable periodic heartbeat execution
+</ParamField>
+
+<ParamField path="heartbeat_period" type="int" default="30">
+  Heartbeat interval in minutes
+</ParamField>
+
+<ParamField path="heartbeat_message" type="str" default="">
+  Message to send to the agent on each heartbeat tick
+</ParamField>
+
+### Standard Agent Parameters
+
+All parameters from the base [Agent](/api/agent) class are also supported:
+- `debug`, `debug_level`, `print`
+- `system_prompt`, `role`, `goal`, `instructions`
+- `tools`, `enable_thinking_tool`, `show_tool_calls`
+- `reflection`, `context_management`
+- `user_policy`, `agent_policy`, `tool_policy_pre`, `tool_policy_post`
+- `reasoning_effort`, `thinking_enabled`
+- `culture`, `metadata`
+
+## Built-in Tools
+
+AutonomousAgent comes with two powerful toolkits:
+
+### Filesystem Toolkit
+
+When `enable_filesystem=True`, the following tools are available:
+
+#### read_file
+
+Read file contents from the workspace.
+
+```python
+# Agent can use this tool
+result = agent.do("Read the main.py file")
+```
+
+<ParamField path="file_path" type="str" required>
+  Relative path to file within workspace
+</ParamField>
+
+<ParamField path="offset" type="int" default="0">
+  Line number to start reading from (0-based)
+</ParamField>
+
+<ParamField path="limit" type="int" default="None">
+  Number of lines to read
+</ParamField>
+
+<ResponseField name="content" type="str">
+  File contents
+</ResponseField>
+
+#### write_file
+
+Create new files or overwrite existing files.
+
+<ParamField path="file_path" type="str" required>
+  Relative path to file within workspace
+</ParamField>
+
+<ParamField path="content" type="str" required>
+  Content to write
+</ParamField>
+
+#### edit_file
+
+Make precise text replacements in files.
+
+<ParamField path="file_path" type="str" required>
+  Relative path to file within workspace
+</ParamField>
+
+<ParamField path="old_string" type="str" required>
+  Text to replace
+</ParamField>
+
+<ParamField path="new_string" type="str" required>
+  Replacement text
+</ParamField>
+
+<ParamField path="replace_all" type="bool" default="False">
+  Replace all occurrences (default: False)
+</ParamField>
+
+#### list_files
+
+List directory contents.
+
+<ParamField path="directory" type="str" default=".">
+  Directory path relative to workspace
+</ParamField>
+
+<ParamField path="pattern" type="str" default="None">
+  Glob pattern for filtering (e.g., "*.py")
+</ParamField>
+
+#### search_files
+
+Find files by name pattern.
+
+<ParamField path="pattern" type="str" required>
+  Glob pattern to search for (e.g., "**/*.py" for all Python files)
+</ParamField>
+
+#### grep_files
+
+Search for text patterns within files.
+
+<ParamField path="pattern" type="str" required>
+  Regex pattern to search for
+</ParamField>
+
+<ParamField path="include" type="str" default="None">
+  File pattern to include (e.g., "*.py")
+</ParamField>
+
+#### file_info
+
+Get file metadata.
+
+<ParamField path="file_path" type="str" required>
+  Path to file or directory
+</ParamField>
+
+#### Other filesystem tools:
+
+- `create_directory(path)` - Create directories
+- `move_file(src, dst)` - Move or rename
+- `copy_file(src, dst)` - Copy files/directories
+- `delete_file(path)` - Delete files/directories
+
+### Shell Toolkit
+
+When `enable_shell=True`, the following tools are available:
+
+#### run_command
+
+Execute shell commands in the workspace directory.
+
+```python
+# Agent can use this tool
+result = agent.do("Run pytest to test the code")
+```
+
+<ParamField path="command" type="str" required>
+  Shell command to execute
+</ParamField>
+
+<ParamField path="timeout" type="int" default="None">
+  Command timeout in seconds (uses shell_timeout if not specified)
+</ParamField>
+
+<ResponseField name="output" type="str">
+  Command output (stdout and stderr combined)
+</ResponseField>
+
+#### run_python
+
+Execute Python code snippets.
+
+<ParamField path="code" type="str" required>
+  Python code to execute
+</ParamField>
+
+<ResponseField name="output" type="str">
+  Execution output
+</ResponseField>
+
+#### check_command_exists
+
+Verify if a command is available.
+
+<ParamField path="command" type="str" required>
+  Command name to check
+</ParamField>
+
+<ResponseField name="exists" type="bool">
+  True if command is available
+</ResponseField>
+
+## Methods
+
+AutonomousAgent inherits all methods from [Agent](/api/agent):
+
+- `do(task)` - Execute task synchronously
+- `do_async(task)` - Execute task asynchronously
+- `stream(task)` - Stream execution synchronously
+- `astream(task)` - Stream execution asynchronously
+- `add_tools(tools)` - Add additional tools
+- `get_run_output()` - Get last execution output
+- `get_session_usage()` - Get usage statistics
+
+### Additional Methods
+
+#### reset_filesystem_tracking()
+
+Reset filesystem read tracking.
+
+```python
+agent.reset_filesystem_tracking()
+```
+
+This clears the record of which files have been read, affecting edit_file's read-before-edit enforcement.
+
+#### execute_heartbeat()
+
+Manually execute the heartbeat message.
+
+```python
+response = agent.execute_heartbeat()
+```
+
+<ResponseField name="response" type="str">
+  Agent's response to the heartbeat message
+</ResponseField>
+
+#### aexecute_heartbeat()
+
+Asynchronous version of execute_heartbeat.
+
+```python
+response = await agent.aexecute_heartbeat()
+```
+
+## Properties
+
+### autonomous_workspace
+
+```python
+workspace = agent.autonomous_workspace
+```
+
+<ResponseField name="workspace" type="Path">
+  Resolved workspace directory path
+</ResponseField>
+
+### autonomous_storage
+
+```python
+storage = agent.autonomous_storage
+```
+
+<ResponseField name="storage" type="Storage">
+  Storage backend created by AutonomousAgent
+</ResponseField>
+
+### autonomous_memory
+
+```python
+memory = agent.autonomous_memory
+```
+
+<ResponseField name="memory" type="Memory">
+  Memory instance created by AutonomousAgent
+</ResponseField>
+
+### filesystem_toolkit
+
+```python
+fs = agent.filesystem_toolkit
+```
+
+<ResponseField name="toolkit" type="AutonomousFilesystemToolKit">
+  Filesystem operations toolkit (if enabled)
+</ResponseField>
+
+### shell_toolkit
+
+```python
+shell = agent.shell_toolkit
+```
+
+<ResponseField name="toolkit" type="AutonomousShellToolKit">
+  Shell command execution toolkit (if enabled)
+</ResponseField>
+
+## Usage Examples
+
+### Basic Coding Assistant
+
+```python
+from upsonic import AutonomousAgent, Task
+
+agent = AutonomousAgent(
+    model="openai/gpt-4o",
+    workspace="/path/to/project"
+)
+
+task = Task("Read main.py and add error handling to the process_data function")
+result = agent.do(task)
+```
+
+### DevOps Automation
+
+```python
+from upsonic import AutonomousAgent
+
+agent = AutonomousAgent(
+    model="anthropic/claude-sonnet-4-20250514",
+    workspace="/path/to/deployment",
+    shell_timeout=300
+)
+
+result = agent.do(
+    "Check the logs for errors, then restart the service if needed"
+)
+```
+
+### Code Review Agent
+
+```python
+from upsonic import AutonomousAgent, Task
+
+agent = AutonomousAgent(
+    model="openai/gpt-4o",
+    workspace="/path/to/repo",
+    role="Senior Code Reviewer",
+    goal="Review code for quality, security, and best practices"
+)
+
+task = Task(
+    "Review all Python files in the src/ directory and create a review.md file with findings"
+)
+
+result = agent.do(task)
+```
+
+### Testing Automation
+
+```python
+from upsonic import AutonomousAgent
+
+agent = AutonomousAgent(
+    model="openai/gpt-4o",
+    workspace="/path/to/project"
+)
+
+# Agent can run tests and analyze results
+result = agent.do(
+    "Run pytest with coverage, analyze any failures, and fix the issues"
+)
+```
+
+### Workspace with Memory
+
+```python
+from upsonic import AutonomousAgent, InMemoryStorage, Memory
+
+storage = InMemoryStorage()
+memory = Memory(
+    storage=storage,
+    full_session_memory=True
+)
+
+agent = AutonomousAgent(
+    model="openai/gpt-4o",
+    workspace="/path/to/project",
+    memory=memory
+)
+
+# Agent remembers previous context
+agent.do("Find all TODO comments in the codebase")
+agent.do("Create a todo.md file with all the TODOs you found")  # Uses context
+```
+
+### Security-Restricted Agent
+
+```python
+from upsonic import AutonomousAgent
+
+agent = AutonomousAgent(
+    model="openai/gpt-4o",
+    workspace="/safe/sandbox",
+    enable_shell=True,
+    blocked_commands=[
+        "rm -rf",
+        "sudo",
+        "chmod",
+        "curl",
+        "wget"
+    ]
+)
+
+# Dangerous commands are blocked
+result = agent.do("List files and create a backup")
+```
+
+## Security Considerations
+
+### Workspace Sandboxing
+
+All file operations are restricted to the workspace directory:
+
+```python
+# ✅ Allowed - within workspace
+agent.do("Read src/main.py")
+
+# ❌ Blocked - outside workspace
+agent.do("Read /etc/passwd")  # Path traversal blocked
+```
+
+### Command Blocking
+
+Use `blocked_commands` to prevent dangerous operations:
+
+```python
+agent = AutonomousAgent(
+    model="openai/gpt-4o",
+    workspace="/project",
+    blocked_commands=["rm -rf", "sudo", "dd"]
+)
+```
+
+### File Read Enforcement
+
+The `edit_file` tool requires reading the file first to prevent blind edits:
+
+```python
+# Agent must read before editing
+agent.do("Read main.py")  # First read
+agent.do("Edit main.py to add error handling")  # Then edit
+```
+
+## Related Classes
+
+- [Agent](/api/agent) - Base agent class
+- [Task](/api/task) - Task definition
+- [Memory](/api/memory) - Session management
+- [Storage](/api/storage) - Persistence backends

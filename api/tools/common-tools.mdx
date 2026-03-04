@@ -1,0 +1,516 @@
+---
+title: "Common Tools"
+description: "Built-in tool implementations including financial data, search tools, and utilities"
+---
+
+## Overview
+
+Upsonic provides a collection of common tools for financial data retrieval, web search, and other utilities. These tools can be easily integrated into your AI agents.
+
+## Financial Tools
+
+### YFinanceTools
+
+**Location:** `src/upsonic/tools/common_tools/financial_tools.py:25`
+
+Comprehensive financial data toolkit using Yahoo Finance.
+
+```python
+class YFinanceTools:
+    """Comprehensive financial data toolkit using Yahoo Finance."""
+    
+    def __init__(
+        self,
+        stock_price: bool = True,
+        company_info: bool = False,
+        analyst_recommendations: bool = False,
+        company_news: bool = False,
+        enable_all: bool = False,
+    )
+```
+
+#### Installation
+
+```bash
+pip install "upsonic[tools]"
+```
+
+Requires: `yfinance` and `pandas` packages.
+
+#### Parameters
+
+- `stock_price` (bool): Enable stock price retrieval (default: True)
+- `company_info` (bool): Enable company information retrieval (default: False)
+- `analyst_recommendations` (bool): Enable analyst recommendations (default: False)
+- `company_news` (bool): Enable company news retrieval (default: False)
+- `enable_all` (bool): Enable all available tools (default: False)
+
+#### Methods
+
+**get_current_stock_price()**
+```python
+def get_current_stock_price(self, symbol: str) -> str:
+    """Get the current stock price for a given symbol.
+    
+    Args:
+        symbol: Stock symbol (e.g., 'AAPL', 'TSLA')
+    
+    Returns:
+        Current stock price as formatted string
+    """
+```
+
+**get_company_info()**
+```python
+def get_company_info(self, symbol: str) -> str:
+    """Get comprehensive company information.
+    
+    Args:
+        symbol: Stock symbol
+    
+    Returns:
+        JSON-formatted company information
+    """
+```
+
+**get_analyst_recommendations()**
+```python
+def get_analyst_recommendations(self, symbol: str) -> str:
+    """Get analyst recommendations for a stock.
+    
+    Args:
+        symbol: Stock symbol
+    
+    Returns:
+        JSON-formatted analyst recommendations
+    """
+```
+
+**get_company_news()**
+```python
+def get_company_news(self, symbol: str, num_stories: int = 3) -> str:
+    """Get recent company news.
+    
+    Args:
+        symbol: Stock symbol
+        num_stories: Number of news stories to retrieve
+    
+    Returns:
+        JSON-formatted news stories
+    """
+```
+
+**get_stock_fundamentals()**
+```python
+def get_stock_fundamentals(self, symbol: str) -> str:
+    """Get key financial fundamentals for a stock.
+    
+    Returns:
+        JSON with market_cap, pe_ratio, pb_ratio, dividend_yield, eps, beta, etc.
+    """
+```
+
+**get_income_statements()**
+```python
+def get_income_statements(self, symbol: str) -> str:
+    """Get income statement data.
+    
+    Returns:
+        JSON-formatted income statement data
+    """
+```
+
+**get_historical_stock_prices()**
+```python
+def get_historical_stock_prices(
+    self, 
+    symbol: str, 
+    period: str = "1mo", 
+    interval: str = "1d"
+) -> str:
+    """Get historical stock price data.
+    
+    Args:
+        symbol: Stock symbol
+        period: Time period ('1d', '5d', '1mo', '3mo', '6mo', '1y', '2y', '5y', '10y', 'ytd', 'max')
+        interval: Data interval ('1m', '2m', '5m', '15m', '30m', '60m', '90m', '1h', '1d', '5d', '1wk', '1mo', '3mo')
+    
+    Returns:
+        JSON-formatted historical price data
+    """
+```
+
+**get_technical_indicators()**
+```python
+def get_technical_indicators(self, symbol: str, period: str = "3mo") -> str:
+    """Get technical indicator data.
+    
+    Args:
+        symbol: Stock symbol
+        period: Time period for analysis
+    
+    Returns:
+        JSON-formatted technical indicator data
+    """
+```
+
+**functions()**
+```python
+def functions(self) -> List:
+    """Return the list of tool functions to be used by the agent."""
+```
+
+#### Example Usage
+
+```python
+from upsonic import Agent
+from upsonic.tools.common_tools import YFinanceTools
+
+# Create financial tools with specific features
+finance_tools = YFinanceTools(
+    stock_price=True,
+    company_info=True,
+    analyst_recommendations=True,
+    company_news=True
+)
+
+# Or enable all tools
+finance_tools = YFinanceTools(enable_all=True)
+
+# Create agent with financial tools
+agent = Agent(
+    model="openai/gpt-4o",
+    tools=finance_tools.functions()
+)
+
+# Use the agent
+result = agent.run("What is the current stock price of AAPL?")
+print(result)
+```
+
+---
+
+## Search Tools
+
+### Tavily Search Tool
+
+**Location:** `src/upsonic/tools/common_tools/tavily.py`
+
+Powered search tool using Tavily AI search engine.
+
+```python
+def tavily_search_tool(api_key: str)
+```
+
+#### Installation
+
+```bash
+pip install "upsonic[tools]"
+```
+
+Get your API key from [https://app.tavily.com/home](https://app.tavily.com/home).
+
+#### Search Function
+
+```python
+async def tavily_search(
+    query: str,
+    search_deep: Literal['basic', 'advanced'] = 'basic',
+    topic: Literal['general', 'news'] = 'general',
+    time_range: Literal['day', 'week', 'month', 'year', 'd', 'w', 'm', 'y'] | None = None,
+) -> list[TavilySearchResult]
+```
+
+#### TavilySearchResult
+
+```python
+class TavilySearchResult(TypedDict):
+    title: str
+    """The title of the search result."""
+    
+    url: str
+    """The URL of the search result."""
+    
+    content: str
+    """A short description of the search result."""
+    
+    score: float
+    """The relevance score of the search result."""
+```
+
+#### Example Usage
+
+```python
+from upsonic import Agent
+from upsonic.tools.common_tools import tavily_search_tool
+
+# Create Tavily search tool
+tavily = tavily_search_tool(api_key="your-tavily-api-key")
+
+# Create agent with search tool
+agent = Agent(
+    model="openai/gpt-4o",
+    tools=[tavily]
+)
+
+# Use the agent
+result = agent.run("Search for recent news about AI developments")
+print(result)
+```
+
+---
+
+### DuckDuckGo Search Tool
+
+**Location:** `src/upsonic/tools/common_tools/duckduckgo.py`
+
+Privacy-focused search tool using DuckDuckGo.
+
+```python
+def duckduckgo_search_tool(
+    duckduckgo_client: DDGS | None = None, 
+    max_results: int | None = None
+)
+```
+
+#### Installation
+
+```bash
+pip install "upsonic[tools]"
+```
+
+#### Parameters
+
+- `duckduckgo_client` (DDGS | None): Custom DuckDuckGo search client (optional)
+- `max_results` (int | None): Maximum number of results (optional)
+
+#### Search Function
+
+```python
+async def duckduckgo_search(query: str) -> list[DuckDuckGoResult]
+```
+
+#### DuckDuckGoResult
+
+```python
+class DuckDuckGoResult(TypedDict):
+    title: str
+    """The title of the search result."""
+    
+    href: str
+    """The URL of the search result."""
+    
+    body: str
+    """The body of the search result."""
+```
+
+#### Example Usage
+
+```python
+from upsonic import Agent
+from upsonic.tools.common_tools import duckduckgo_search_tool
+
+# Create DuckDuckGo search tool
+ddg_search = duckduckgo_search_tool(max_results=5)
+
+# Create agent with search tool
+agent = Agent(
+    model="openai/gpt-4o",
+    tools=[ddg_search]
+)
+
+# Use the agent
+result = agent.run("Search for Python programming tutorials")
+print(result)
+```
+
+---
+
+### BoCha Search Tool
+
+**Location:** `src/upsonic/tools/common_tools/bochasearch.py`
+
+Search tool with time filtering and domain control.
+
+```python
+def bocha_search_tool(api_key: str)
+```
+
+#### Search Function
+
+```python
+async def bocha_search(
+    query: str,
+    freshness: Literal[
+        "noLimit", "oneDay", "oneWeek", "oneMonth", "oneYear", 
+        "YYYY-MM-DD", "YYYY-MM-DD..YYYY-MM-DD"
+    ] = "noLimit",
+    summary: bool = True,
+    count: int = 10,
+    include: Optional[str] = None,
+    exclude: Optional[str] = None
+) -> List[BoChaSearchResult]
+```
+
+#### BoChaSearchResult
+
+```python
+class BoChaSearchResult(TypedDict):
+    title: str
+    """Webpage title"""
+    
+    url: str
+    """Webpage URL"""
+    
+    summary: Optional[str]
+    """Text summary provided by Bocha"""
+    
+    site_name: Optional[str]
+    """Name of the website"""
+    
+    site_icon: Optional[str]
+    """URL of the website's favicon"""
+    
+    date_last_crawled: Optional[str]
+    """Timestamp of when the page was last crawled"""
+```
+
+#### Example Usage
+
+```python
+from upsonic import Agent
+from upsonic.tools.common_tools import bocha_search_tool
+
+# Create BoCha search tool
+bocha = bocha_search_tool(api_key="your-bocha-api-key")
+
+# Create agent with search tool
+agent = Agent(
+    model="openai/gpt-4o",
+    tools=[bocha]
+)
+
+# Search with filters
+result = agent.run(
+    "Search for recent articles about machine learning from the last week"
+)
+print(result)
+```
+
+---
+
+## Tool Decorator
+
+**Location:** `src/upsonic/tools/config.py:116`
+
+Decorator to configure tool behavior.
+
+```python
+def tool(*args: Any, **kwargs: Any) -> Union[Callable, _ToolDecorator]:
+    """Decorator to configure tool behavior.
+    
+    Use @tool or @tool(...) for configuration.
+    """
+```
+
+### Example Usage
+
+```python
+from upsonic.tools import tool
+
+# Simple tool
+@tool
+def calculate_sum(a: int, b: int) -> int:
+    """Calculate the sum of two numbers."""
+    return a + b
+
+# Tool with configuration
+@tool(
+    requires_confirmation=True,
+    cache_results=True,
+    timeout=60.0
+)
+def sensitive_operation(data: str) -> str:
+    """Perform a sensitive operation that requires confirmation."""
+    return f"Processed: {data}"
+
+# Async tool
+@tool
+async def fetch_data(url: str) -> dict:
+    """Fetch data from a URL."""
+    async with aiohttp.ClientSession() as session:
+        async with session.get(url) as response:
+            return await response.json()
+```
+
+---
+
+## ToolConfig
+
+**Location:** `src/upsonic/tools/config.py:17`
+
+Tool behavior configuration.
+
+```python
+class ToolConfig(BaseModel):
+    """Tool behavior configuration for the Upsonic framework."""
+    
+    requires_confirmation: bool = False
+    requires_user_input: bool = False
+    user_input_fields: List[str] = []
+    external_execution: bool = False
+    show_result: bool = False
+    stop_after_tool_call: bool = False
+    sequential: bool = False
+    cache_results: bool = False
+    cache_dir: Optional[str] = None
+    cache_ttl: Optional[int] = None
+    tool_hooks: Optional[ToolHooks] = None
+    max_retries: Optional[int] = 5
+    timeout: Optional[float] = 30.0
+    strict: Optional[bool] = None
+    docstring_format: str = 'auto'
+    require_parameter_descriptions: bool = False
+```
+
+### Key Configuration Options
+
+- `requires_confirmation`: Pause and require user confirmation before executing
+- `requires_user_input`: Prompt user for input for specified fields
+- `external_execution`: Tool execution handled by external process
+- `show_result`: Show output to user, NOT sent back to LLM
+- `stop_after_tool_call`: Terminate agent run after this tool call
+- `sequential`: Require sequential execution (no parallelization)
+- `cache_results`: Cache results based on arguments
+- `timeout`: Timeout for tool execution in seconds
+- `max_retries`: Maximum number of retries allowed
+
+### Example Usage
+
+```python
+from upsonic.tools import tool, ToolConfig
+
+config = ToolConfig(
+    requires_confirmation=True,
+    cache_results=True,
+    cache_ttl=3600,  # 1 hour
+    timeout=120.0,
+    max_retries=3
+)
+
+@tool(
+    requires_confirmation=True,
+    cache_results=True,
+    timeout=60.0
+)
+def my_tool(param: str) -> str:
+    """A configured tool."""
+    return f"Result: {param}"
+```
+
+---
+
+## Related
+
+- [Tool Base Classes](/api/tools/base) - Core tool interfaces and base classes
+- [Agent](/api/agent) - Agent class that uses tools

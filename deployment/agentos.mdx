@@ -1,0 +1,697 @@
+---
+title: AgentOS Platform
+description: Kubernetes-based deployment platform for production AI agents with monitoring and metrics
+---
+
+AgentOS is Upsonic's optional deployment platform that provides a production-ready runtime for AI agents. It offers Kubernetes-based orchestration, cost tracking, performance metrics, and self-hosted infrastructure control.
+
+## Overview
+
+AgentOS transforms your local agent development into scalable, monitored production deployments with:
+
+- **Kubernetes-based Runtime** - Deploy agents as isolated microservices
+- **Metrics Dashboard** - Track costs, tokens, and performance
+- **Self-Hosted Infrastructure** - Full control over data and deployment
+- **One-Click Deployment** - Automated CI/CD pipelines
+- **Multi-Agent Orchestration** - Manage multiple agents centrally
+
+<img width="3024" height="1590" alt="AgentOS Dashboard" src="https://github.com/user-attachments/assets/42fceaca-2dec-4496-ab67-4b9067caca42" />
+
+## Key Features
+
+### Production Runtime
+
+**Kubernetes Deployment:**
+- Each agent runs as an isolated pod
+- Auto-scaling based on load
+- Health checks and automatic restarts
+- Rolling updates with zero downtime
+- Resource limits (CPU, memory, storage)
+
+**FastAPI Microservices:**
+- RESTful API endpoints
+- OpenAPI documentation
+- JSON and multipart/form-data support
+- Automatic request validation
+- Error handling and logging
+
+### Metrics and Monitoring
+
+**Cost Tracking:**
+- Per-transaction LLM costs
+- Token usage by model
+- Provider breakdown (OpenAI, Anthropic, etc.)
+- Cost trends over time
+- Budget alerts
+
+**Performance Metrics:**
+- Request latency
+- Response times
+- Success/error rates
+- Throughput (requests per second)
+- Agent utilization
+
+**Dashboard Features:**
+- Real-time metrics visualization
+- Historical data analysis
+- Custom date ranges
+- Export to CSV/JSON
+- Alert configuration
+
+### Infrastructure Management
+
+**Self-Hosted:**
+- Deploy on your own Kubernetes cluster
+- Full control over infrastructure
+- Private data handling
+- Compliance-friendly
+- No vendor lock-in
+
+**Scalability:**
+- Horizontal pod autoscaling
+- Vertical resource scaling
+- Multi-region deployment
+- Load balancing
+- High availability
+
+## Getting Started
+
+### Prerequisites
+
+1. **Kubernetes Cluster:**
+   - Local: Docker Desktop, Minikube, or kind
+   - Cloud: GKE, EKS, AKS, or DigitalOcean Kubernetes
+   - On-premise: Self-managed cluster
+
+2. **kubectl configured:**
+```bash
+# Verify kubectl access
+kubectl cluster-info
+kubectl get nodes
+```
+
+3. **Docker (for building images):**
+```bash
+# Verify Docker installation
+docker --version
+```
+
+### Project Structure
+
+Prepare your agent project:
+
+```
+my-agent/
+├── main.py                 # Agent entry point
+├── upsonic_configs.json   # Configuration
+├── requirements.txt       # Python dependencies
+└── .env                   # Environment variables
+```
+
+**Example main.py:**
+```python
+from upsonic import Agent, Task
+
+async def main(inputs):
+    user_query = inputs.get("user_query")
+    agent = Agent("anthropic/claude-sonnet-4-5")
+    task = Task(user_query)
+    result = await agent.do_async(task)
+    return {"response": str(result)}
+```
+
+**Example upsonic_configs.json:**
+```json
+{
+  "agent_name": "Production Agent",
+  "description": "AI agent for production workloads",
+  "machine_spec": {
+    "cpu": 2,
+    "memory": 4096,
+    "storage": 10240
+  },
+  "dependencies": {
+    "api": [
+      "fastapi>=0.115.12",
+      "uvicorn>=0.34.2",
+      "upsonic"
+    ]
+  },
+  "entrypoints": {
+    "api_file": "main.py"
+  },
+  "input_schema": {
+    "inputs": {
+      "user_query": {
+        "type": "string",
+        "required": true
+      }
+    }
+  },
+  "output_schema": {
+    "response": {
+      "type": "string"
+    }
+  }
+}
+```
+
+## Deployment Methods
+
+### Method 1: Using CLI
+
+```bash
+# 1. Create deployment package
+upsonic zip my-agent-v1.zip
+
+# 2. Upload to AgentOS dashboard
+# Navigate to AgentOS → Deploy → Upload ZIP
+
+# 3. Configure deployment settings
+# - Set environment variables
+# - Configure resources
+# - Set scaling policies
+
+# 4. Deploy
+# Click "Deploy" to start Kubernetes deployment
+```
+
+### Method 2: Docker + Kubernetes
+
+**1. Create Dockerfile:**
+
+```dockerfile
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Copy requirements
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy application
+COPY . .
+
+# Expose port
+EXPOSE 8000
+
+# Run with uvicorn
+CMD ["upsonic", "run", "--host", "0.0.0.0", "--port", "8000"]
+```
+
+**2. Build and push image:**
+
+```bash
+# Build
+docker build -t my-registry/my-agent:v1 .
+
+# Push to registry
+docker push my-registry/my-agent:v1
+```
+
+**3. Create Kubernetes manifests:**
+
+```yaml
+# deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: my-agent
+  labels:
+    app: my-agent
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: my-agent
+  template:
+    metadata:
+      labels:
+        app: my-agent
+    spec:
+      containers:
+      - name: agent
+        image: my-registry/my-agent:v1
+        ports:
+        - containerPort: 8000
+        env:
+        - name: OPENAI_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: agent-secrets
+              key: openai-api-key
+        - name: ANTHROPIC_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: agent-secrets
+              key: anthropic-api-key
+        resources:
+          requests:
+            memory: "2Gi"
+            cpu: "1000m"
+          limits:
+            memory: "4Gi"
+            cpu: "2000m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 10
+          periodSeconds: 5
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: my-agent-service
+spec:
+  selector:
+    app: my-agent
+  ports:
+  - protocol: TCP
+    port: 80
+    targetPort: 8000
+  type: LoadBalancer
+```
+
+**4. Create secrets:**
+
+```bash
+kubectl create secret generic agent-secrets \
+  --from-literal=openai-api-key=$OPENAI_API_KEY \
+  --from-literal=anthropic-api-key=$ANTHROPIC_API_KEY
+```
+
+**5. Deploy:**
+
+```bash
+kubectl apply -f deployment.yaml
+
+# Check status
+kubectl get pods
+kubectl get services
+
+# View logs
+kubectl logs -l app=my-agent --tail=100 -f
+```
+
+### Method 3: Docker Compose (Development)
+
+For local testing before Kubernetes deployment:
+
+```yaml
+# docker-compose.yml
+version: '3.8'
+
+services:
+  agent:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - REDIS_URL=redis://redis:6379
+      - POSTGRES_URL=postgresql://user:pass@postgres:5432/db
+    depends_on:
+      - redis
+      - postgres
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: pass
+      POSTGRES_DB: db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  redis_data:
+  postgres_data:
+```
+
+**Run locally:**
+
+```bash
+# Start services
+docker-compose up -d
+
+# View logs
+docker-compose logs -f agent
+
+# Test endpoint
+curl -X POST http://localhost:8000/call \
+  -H "Content-Type: application/json" \
+  -d '{"user_query": "Hello!"}'
+
+# Stop services
+docker-compose down
+```
+
+## Configuration
+
+### Environment Variables
+
+**AI Provider Keys:**
+```bash
+OPENAI_API_KEY=sk-...
+ANTHROPIC_API_KEY=sk-ant-...
+AZURE_OPENAI_API_KEY=...
+AWS_ACCESS_KEY_ID=...
+AWS_SECRET_ACCESS_KEY=...
+```
+
+**Storage Backends:**
+```bash
+REDIS_URL=redis://localhost:6379
+POSTGRES_URL=postgresql://user:pass@localhost/db
+MONGO_URL=mongodb://user:pass@localhost:27017
+```
+
+**Application Settings:**
+```bash
+UPSONIC_WORKERS_AMOUNT=4
+API_WORKERS=4
+RUNNER_CONCURRENCY=10
+UPSONIC_TELEMETRY=false
+```
+
+### Resource Limits
+
+Configure in `upsonic_configs.json`:
+
+```json
+{
+  "machine_spec": {
+    "cpu": 2,           // CPU cores
+    "memory": 4096,     // Memory in MB
+    "storage": 10240    // Storage in MB
+  }
+}
+```
+
+Translates to Kubernetes:
+
+```yaml
+resources:
+  requests:
+    cpu: "2000m"      # 2 cores
+    memory: "4Gi"     # 4 GB
+  limits:
+    cpu: "2000m"
+    memory: "4Gi"
+```
+
+### Scaling Policies
+
+**Horizontal Pod Autoscaler:**
+
+```yaml
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: my-agent-hpa
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: my-agent
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+```
+
+Apply:
+```bash
+kubectl apply -f hpa.yaml
+kubectl get hpa
+```
+
+## Monitoring and Metrics
+
+### Dashboard Access
+
+1. **Login to AgentOS:**
+   - Navigate to your AgentOS instance
+   - Enter credentials
+
+2. **Select Agent:**
+   - View all deployed agents
+   - Click on agent name
+
+3. **View Metrics:**
+   - **Costs**: Total costs, breakdown by model
+   - **Tokens**: Input/output tokens, trends
+   - **Performance**: Latency, throughput, errors
+   - **Requests**: Total requests, success rate
+
+### Metrics API
+
+Query metrics programmatically:
+
+```bash
+# Get cost metrics
+curl http://agentos-api/v1/agents/my-agent/metrics/costs?period=7d
+
+# Get performance metrics
+curl http://agentos-api/v1/agents/my-agent/metrics/performance?period=24h
+
+# Get token usage
+curl http://agentos-api/v1/agents/my-agent/metrics/tokens?period=30d
+```
+
+### Custom Metrics
+
+Integrate with Prometheus:
+
+```python
+from prometheus_client import Counter, Histogram, start_http_server
+
+# Define metrics
+request_counter = Counter('agent_requests_total', 'Total requests')
+latency_histogram = Histogram('agent_latency_seconds', 'Request latency')
+
+# Start metrics server
+start_http_server(9090)
+
+# Instrument your code
+async def main(inputs):
+    request_counter.inc()
+    with latency_histogram.time():
+        # Your agent logic
+        result = await agent.do_async(task)
+    return result
+```
+
+## Production Best Practices
+
+### 1. Security
+
+**Use Secrets Management:**
+```bash
+# Kubernetes secrets
+kubectl create secret generic agent-secrets \
+  --from-literal=openai-api-key=$OPENAI_API_KEY
+
+# Or use external secrets (AWS Secrets Manager, Vault)
+```
+
+**Network Policies:**
+```yaml
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: agent-network-policy
+spec:
+  podSelector:
+    matchLabels:
+      app: my-agent
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          role: api-gateway
+    ports:
+    - protocol: TCP
+      port: 8000
+```
+
+### 2. High Availability
+
+**Multiple Replicas:**
+```yaml
+spec:
+  replicas: 3  # Minimum for HA
+```
+
+**Pod Disruption Budget:**
+```yaml
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: my-agent-pdb
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels:
+      app: my-agent
+```
+
+### 3. Observability
+
+**Logging:**
+```python
+import logging
+
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+
+logger = logging.getLogger(__name__)
+logger.info("Processing request", extra={"user_id": user_id})
+```
+
+**Distributed Tracing:**
+```python
+from opentelemetry import trace
+from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
+
+tracer = trace.get_tracer(__name__)
+
+@tracer.start_as_current_span("agent_execution")
+async def main(inputs):
+    result = await agent.do_async(task)
+    return result
+```
+
+### 4. Cost Optimization
+
+**Model Selection:**
+```python
+# Use cheaper models for simple tasks
+if task.complexity == "simple":
+    agent = Agent("openai/gpt-4o-mini")
+else:
+    agent = Agent("anthropic/claude-sonnet-4-5")
+```
+
+**Caching:**
+```python
+from upsonic.storage import RedisStorage
+from functools import lru_cache
+
+# Cache frequent queries
+@lru_cache(maxsize=1000)
+def get_cached_response(query):
+    return agent.do(Task(query))
+```
+
+## Troubleshooting
+
+### Pod Not Starting
+
+```bash
+# Check pod status
+kubectl get pods
+
+# View pod events
+kubectl describe pod <pod-name>
+
+# Check logs
+kubectl logs <pod-name> --previous
+```
+
+**Common issues:**
+- Missing secrets
+- Insufficient resources
+- Image pull errors
+- Failed health checks
+
+### High Latency
+
+```bash
+# Check resource usage
+kubectl top pods
+
+# Scale up if needed
+kubectl scale deployment my-agent --replicas=5
+```
+
+### Connection Errors
+
+```bash
+# Test service connectivity
+kubectl run -it --rm debug --image=curlimages/curl --restart=Never -- \
+  curl http://my-agent-service/health
+
+# Check service endpoints
+kubectl get endpoints my-agent-service
+```
+
+## Migration Guide
+
+### From Local to AgentOS
+
+1. **Test locally:**
+```bash
+upsonic run --port 8000
+```
+
+2. **Create deployment package:**
+```bash
+upsonic zip production-v1.zip
+```
+
+3. **Deploy to staging:**
+   - Upload to AgentOS
+   - Configure staging environment
+   - Run integration tests
+
+4. **Deploy to production:**
+   - Review metrics from staging
+   - Configure production settings
+   - Deploy with monitoring
+
+5. **Monitor and optimize:**
+   - Track costs and performance
+   - Adjust scaling policies
+   - Optimize model selection
+
+## Next Steps
+
+- Configure [interface integrations](/deployment/interfaces)
+- Set up [monitoring and alerts](/guides/monitoring)
+- Implement [safety policies](/concepts/safety-engine)
+- Optimize [agent performance](/guides/optimization)

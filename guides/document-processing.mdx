@@ -1,0 +1,669 @@
+---
+title: Document Processing
+description: OCR, PDF processing, image analysis, and advanced document handling
+---
+
+# Document Processing
+
+Learn how to process complex documents including PDFs with tables, images with OCR, and structured data extraction. Master advanced document handling techniques for RAG systems.
+
+## Document Processing Overview
+
+Upsonic provides powerful document processing capabilities:
+
+- **PDF Processing**: Extract text, tables, and images
+- **OCR Support**: Extract text from images and scanned documents
+- **Structured Extraction**: Parse tables, forms, and structured data
+- **Multi-Format Support**: Handle 20+ document formats
+- **Intelligent Loading**: Auto-detect and process any format
+
+## PDF Processing
+
+### Basic PDF Loading
+
+Simple text extraction:
+
+```python
+from upsonic.rag.loaders import PDFLoader
+
+pdf_loader = PDFLoader()
+documents = pdf_loader.load("document.pdf")
+
+for doc in documents:
+    print(f"Page {doc.metadata['page_number']}: {doc.content[:100]}...")
+```
+
+### Advanced PDF with Tables
+
+Better table extraction using PDFPlumber:
+
+```python
+from upsonic.rag.loaders import PDFPlumberLoader
+
+pdf_loader = PDFPlumberLoader(
+    extract_tables=True,     # Extract tables as structured data
+    extract_images=False,    # Skip images for faster processing
+    pages=None               # Process all pages (or specify [0, 1, 2])
+)
+
+documents = pdf_loader.load("report.pdf")
+
+for doc in documents:
+    # Check for extracted tables
+    if "tables" in doc.metadata:
+        tables = doc.metadata["tables"]
+        print(f"Found {len(tables)} tables on page {doc.metadata['page_number']}")
+```
+
+Reference: `/home/daytona/workspace/source/src/upsonic/loaders/pdfplumber.py`
+
+### PDF with Images
+
+Extract text and images using PyMuPDF:
+
+```python
+from upsonic.rag.loaders import PyMuPDFLoader
+
+pdf_loader = PyMuPDFLoader(
+    extract_images=True,
+    image_output_dir="./extracted_images/"
+)
+
+documents = pdf_loader.load("illustrated_guide.pdf")
+
+for doc in documents:
+    if "images" in doc.metadata:
+        images = doc.metadata["images"]
+        print(f"Extracted {len(images)} images")
+        for img_path in images:
+            print(f"  - {img_path}")
+```
+
+### OCR for Scanned PDFs
+
+Extract text from scanned documents:
+
+```python
+from upsonic.rag.loaders import PDFPlumberLoader
+
+# Enable OCR for scanned PDFs
+pdf_loader = PDFPlumberLoader(
+    use_ocr=True,            # Enable OCR
+    ocr_languages=["eng"],   # OCR languages (Tesseract)
+    extract_tables=True
+)
+
+documents = pdf_loader.load("scanned_document.pdf")
+
+for doc in documents:
+    print(doc.content)  # OCR-extracted text
+```
+
+## Image Processing
+
+### Image OCR
+
+Extract text from images:
+
+```python
+import pytesseract
+from PIL import Image
+from upsonic.rag.schemas.data_models import Document
+
+def extract_text_from_image(image_path: str) -> Document:
+    """Extract text from image using OCR."""
+    image = Image.open(image_path)
+    text = pytesseract.image_to_string(image, lang='eng')
+    
+    return Document(
+        content=text,
+        metadata={
+            "source": image_path,
+            "type": "image_ocr",
+            "image_size": image.size
+        }
+    )
+
+doc = extract_text_from_image("screenshot.png")
+print(doc.content)
+```
+
+### Image Analysis with Vision Models
+
+Use vision-capable LLMs:
+
+```python
+from upsonic import Agent, Task
+
+vision_agent = Agent(
+    model="openai/gpt-4o",  # Supports vision
+    name="Image Analyzer"
+)
+
+task = Task(
+    description="Describe what you see in this image",
+    attachments=["./chart.png"]  # Image attachment
+)
+
+result = vision_agent.do(task)
+print(result)  # Description of the image
+```
+
+### Multi-Modal RAG
+
+Combine text and image understanding:
+
+```python
+from upsonic import Agent, Task
+from upsonic.knowledge_base import KnowledgeBase
+
+# Index text documents
+kb = KnowledgeBase(
+    sources=["./docs/"],
+    vectordb=vectordb,
+    embedding_provider=embeddings,
+    name="docs"
+)
+await kb.setup_async()
+
+# Vision-capable agent with text search
+agent = Agent(
+    model="openai/gpt-4o",  # Supports vision
+    tools=[kb]
+)
+
+# Task with both text query and image
+task = Task(
+    description="Compare this chart with the data in our documentation",
+    attachments=["./chart.png"]
+)
+
+result = agent.do(task)
+# Agent searches docs AND analyzes image
+```
+
+## Structured Data Extraction
+
+### CSV Processing
+
+```python
+from upsonic.rag.loaders import CSVLoader
+
+csv_loader = CSVLoader(
+    encoding="utf-8",
+    delimiter=",",
+    has_header=True
+)
+
+documents = csv_loader.load("data.csv")
+
+for doc in documents:
+    # Each row becomes a document
+    print(doc.content)
+    print(doc.metadata["row_number"])
+```
+
+### JSON Processing
+
+```python
+from upsonic.rag.loaders import JSONLoader
+
+json_loader = JSONLoader(
+    jq_schema=".items[]",  # JQ query to extract data
+    content_key="description",
+    metadata_keys=["id", "category", "author"]
+)
+
+documents = json_loader.load("data.json")
+
+for doc in documents:
+    print(f"ID: {doc.metadata['id']}")
+    print(f"Content: {doc.content}")
+```
+
+### XML Processing
+
+```python
+from upsonic.rag.loaders import XMLLoader
+
+xml_loader = XMLLoader(
+    xpath=".//article",  # XPath to extract elements
+    content_tag="body",
+    metadata_tags=["title", "author", "date"]
+)
+
+documents = xml_loader.load("articles.xml")
+```
+
+### YAML Processing
+
+```python
+from upsonic.rag.loaders import YAMLLoader
+
+yaml_loader = YAMLLoader()
+documents = yaml_loader.load("config.yaml")
+
+for doc in documents:
+    print(doc.content)
+    print(doc.metadata)
+```
+
+## Advanced Document Loaders
+
+### Docling Loader
+
+Advanced document understanding:
+
+```python
+from upsonic.rag.loaders import DoclingLoader
+
+docling_loader = DoclingLoader(
+    extract_tables=True,
+    extract_images=True,
+    parse_formulas=True,
+    detect_layout=True
+)
+
+documents = docling_loader.load("complex_document.pdf")
+
+for doc in documents:
+    # Rich metadata with structure
+    print(doc.metadata["layout"])      # Document layout info
+    print(doc.metadata["formulas"])    # Mathematical formulas
+    print(doc.metadata["tables"])      # Structured tables
+```
+
+### HTML Processing
+
+```python
+from upsonic.rag.loaders import HTMLLoader
+
+html_loader = HTMLLoader(
+    remove_scripts=True,
+    remove_styles=True,
+    extract_links=True,
+    extract_metadata=True
+)
+
+documents = html_loader.load("webpage.html")
+
+for doc in documents:
+    print(doc.content)  # Clean text content
+    if "links" in doc.metadata:
+        print(f"Found {len(doc.metadata['links'])} links")
+```
+
+### Microsoft Word Processing
+
+```python
+from upsonic.rag.loaders import DOCXLoader
+
+docx_loader = DOCXLoader(
+    extract_tables=True,
+    extract_images=False,
+    include_headers=True,
+    include_footers=False
+)
+
+documents = docx_loader.load("report.docx")
+
+for doc in documents:
+    print(doc.content)
+    if "tables" in doc.metadata:
+        for table in doc.metadata["tables"]:
+            print(f"Table: {table}")
+```
+
+### Markdown Processing
+
+```python
+from upsonic.rag.loaders import MarkdownLoader
+
+markdown_loader = MarkdownLoader(
+    parse_code_blocks=True,
+    extract_headers=True,
+    extract_links=True
+)
+
+documents = markdown_loader.load("README.md")
+
+for doc in documents:
+    if "code_blocks" in doc.metadata:
+        print(f"Found {len(doc.metadata['code_blocks'])} code blocks")
+    if "headers" in doc.metadata:
+        print(f"Headers: {doc.metadata['headers']}")
+```
+
+## Intelligent Processing
+
+### Auto-Detection
+
+Automatically choose the right loader:
+
+```python
+from upsonic.rag.loaders.factory import create_intelligent_loaders
+
+sources = [
+    "document.pdf",
+    "data.csv",
+    "config.json",
+    "README.md"
+]
+
+# Auto-detect and create appropriate loaders
+loaders = create_intelligent_loaders(sources)
+
+for loader, source in zip(loaders, sources):
+    print(f"{source}: {loader.__class__.__name__}")
+    documents = loader.load(source)
+```
+
+Reference: `src/upsonic/rag/loaders/factory.py`
+
+### Batch Processing
+
+Process multiple documents efficiently:
+
+```python
+from pathlib import Path
+from upsonic.rag.loaders.factory import create_intelligent_loaders
+
+# Get all files
+docs_dir = Path("./documents")
+files = list(docs_dir.glob("**/*"))
+files = [f for f in files if f.is_file()]
+
+# Auto-detect loaders
+loaders = create_intelligent_loaders(files)
+
+# Process all documents
+all_documents = []
+for loader, file_path in zip(loaders, files):
+    try:
+        docs = loader.load(file_path)
+        all_documents.extend(docs)
+        print(f"✓ Processed {file_path.name}")
+    except Exception as e:
+        print(f"✗ Failed to process {file_path.name}: {e}")
+
+print(f"\nTotal documents: {len(all_documents)}")
+```
+
+## Custom Document Loaders
+
+### Creating Custom Loaders
+
+```python
+from upsonic.rag.loaders.base import BaseLoader
+from upsonic.rag.schemas.data_models import Document
+from typing import List
+import json
+
+class CustomJSONLLoader(BaseLoader):
+    """Load JSONL (JSON Lines) files."""
+    
+    def can_load(self, source: str) -> bool:
+        """Check if this loader can handle the source."""
+        return source.endswith('.jsonl')
+    
+    def load(self, source: str) -> List[Document]:
+        """Load JSONL file into documents."""
+        documents = []
+        
+        with open(source, 'r', encoding='utf-8') as f:
+            for line_num, line in enumerate(f, 1):
+                try:
+                    data = json.loads(line)
+                    
+                    doc = Document(
+                        content=data.get('text', ''),
+                        metadata={
+                            'source': source,
+                            'line_number': line_num,
+                            'id': data.get('id'),
+                            **data.get('metadata', {})
+                        }
+                    )
+                    documents.append(doc)
+                    
+                except json.JSONDecodeError as e:
+                    print(f"Error on line {line_num}: {e}")
+                    continue
+        
+        return documents
+
+# Use custom loader
+loader = CustomJSONLLoader()
+documents = loader.load("data.jsonl")
+```
+
+### Loader with Preprocessing
+
+```python
+class PreprocessingPDFLoader(PDFLoader):
+    """PDF loader with text preprocessing."""
+    
+    def load(self, source: str) -> List[Document]:
+        # Load using parent class
+        documents = super().load(source)
+        
+        # Preprocess each document
+        for doc in documents:
+            # Clean text
+            doc.content = self._clean_text(doc.content)
+            
+            # Add custom metadata
+            doc.metadata['word_count'] = len(doc.content.split())
+            doc.metadata['char_count'] = len(doc.content)
+            doc.metadata['preprocessed'] = True
+        
+        return documents
+    
+    def _clean_text(self, text: str) -> str:
+        """Clean and normalize text."""
+        import re
+        
+        # Remove multiple spaces
+        text = re.sub(r'\s+', ' ', text)
+        
+        # Remove special characters
+        text = re.sub(r'[^\w\s.,!?-]', '', text)
+        
+        # Normalize whitespace
+        text = text.strip()
+        
+        return text
+```
+
+## Best Practices
+
+<Tip>
+**Choose the Right PDF Loader**:
+
+- **PDFLoader**: Fast, basic text extraction
+- **PDFPlumberLoader**: Better for tables and layouts
+- **PyMuPDFLoader**: Best for images and complex formatting
+- **DoclingLoader**: Most advanced, slower but comprehensive
+
+```python
+# Simple text PDF
+loader = PDFLoader()
+
+# PDF with tables
+loader = PDFPlumberLoader(extract_tables=True)
+
+# PDF with images
+loader = PyMuPDFLoader(extract_images=True)
+
+# Complex documents
+loader = DoclingLoader(detect_layout=True)
+```
+</Tip>
+
+<Warning>
+**OCR Performance**: OCR is slow and resource-intensive:
+
+- Use only when necessary (scanned documents)
+- Process in batches
+- Consider caching results
+- Use appropriate OCR quality settings
+
+```python
+# Fast OCR (lower quality)
+pdf_loader = PDFPlumberLoader(
+    use_ocr=True,
+    ocr_dpi=150  # Lower DPI = faster
+)
+
+# Better OCR (slower)
+pdf_loader = PDFPlumberLoader(
+    use_ocr=True,
+    ocr_dpi=300  # Higher DPI = better quality
+)
+```
+</Warning>
+
+<Tip>
+**Metadata Strategy**: Add useful metadata for filtering:
+
+```python
+class MetadataEnhancedLoader(PDFLoader):
+    def load(self, source: str) -> List[Document]:
+        documents = super().load(source)
+        
+        for doc in documents:
+            # Add custom metadata
+            doc.metadata['document_type'] = self._detect_type(doc)
+            doc.metadata['language'] = self._detect_language(doc)
+            doc.metadata['reading_time'] = len(doc.content.split()) / 200
+        
+        return documents
+```
+</Tip>
+
+<Tip>
+**Error Handling**: Always handle loading errors:
+
+```python
+for file_path in files:
+    try:
+        loader = get_loader_for_file(file_path)
+        documents = loader.load(file_path)
+        process_documents(documents)
+    except FileNotFoundError:
+        print(f"File not found: {file_path}")
+    except PermissionError:
+        print(f"Permission denied: {file_path}")
+    except Exception as e:
+        print(f"Error loading {file_path}: {e}")
+        continue
+```
+</Tip>
+
+<Note>
+**Memory Management**: Large documents can use significant memory:
+
+```python
+# Process in chunks for large files
+def process_large_pdf(file_path: str, chunk_size: int = 10):
+    loader = PDFLoader()
+    
+    # Process pages in batches
+    total_pages = get_pdf_page_count(file_path)
+    
+    for start_page in range(0, total_pages, chunk_size):
+        end_page = min(start_page + chunk_size, total_pages)
+        
+        # Process chunk
+        documents = loader.load(
+            file_path,
+            pages=list(range(start_page, end_page))
+        )
+        
+        # Process immediately and clear
+        yield from documents
+        del documents
+```
+</Note>
+
+## Common Use Cases
+
+### Legal Document Processing
+
+```python
+legal_loader = PDFPlumberLoader(
+    extract_tables=True,
+    preserve_formatting=True
+)
+
+kb = KnowledgeBase(
+    sources=["./legal_docs/"],
+    loaders=[legal_loader],
+    vectordb=vectordb,
+    embedding_provider=embeddings,
+    name="legal_docs",
+    description="Legal contracts and agreements"
+)
+await kb.setup_async()
+```
+
+### Research Paper Analysis
+
+```python
+research_loader = DoclingLoader(
+    extract_tables=True,
+    parse_formulas=True,
+    extract_references=True
+)
+
+kb = KnowledgeBase(
+    sources=["./papers/"],
+    loaders=[research_loader],
+    vectordb=vectordb,
+    embedding_provider=embeddings,
+    name="research_papers"
+)
+await kb.setup_async()
+```
+
+### Financial Reports
+
+```python
+financial_loader = PDFPlumberLoader(
+    extract_tables=True,  # Important for financial data
+    use_ocr=True          # For scanned reports
+)
+
+kb = KnowledgeBase(
+    sources=["./financial_reports/"],
+    loaders=[financial_loader],
+    vectordb=vectordb,
+    embedding_provider=embeddings,
+    name="financial_reports"
+)
+await kb.setup_async()
+```
+
+### Multi-Format Documentation
+
+```python
+# Auto-detect loaders for mixed formats
+kb = KnowledgeBase(
+    sources=[
+        "./docs/",           # Mixed: PDF, MD, HTML, DOCX
+        "./api/swagger.yaml",
+        "./data/schema.json"
+    ],
+    vectordb=vectordb,
+    embedding_provider=embeddings,
+    # Loaders auto-detected
+)
+await kb.setup_async()
+```
+
+## Next Steps
+
+- [RAG Knowledge Base](/guides/rag-knowledge-base) - Build complete RAG systems
+- [Building Agents](/guides/building-agents) - Use documents with agents
+- [Custom Tools](/guides/custom-tools) - Create document processing tools
+- [Memory Management](/guides/memory-management) - Store processed documents

@@ -1,0 +1,423 @@
+---
+title: "Agent"
+description: "Core AI agent class with model abstraction, tool handling, and streaming execution"
+---
+
+## Overview
+
+The `Agent` class is the central, high-level AI agent in the Upsonic framework. It provides a comprehensive interface for building production-ready AI agents with advanced capabilities including model abstraction, tool handling, streaming execution, memory management, and safety policies.
+
+## Key Features
+
+- **Complete Model Abstraction**: Unified interface for OpenAI, Anthropic, Azure, Bedrock, and more
+- **Advanced Tool Handling**: ToolManager with MCP integration and built-in tools
+- **Streaming and Non-Streaming**: Both real-time streaming and standard execution modes
+- **Memory Management**: Conversation history with session and user memory
+- **Context Management**: Automatic context window optimization and message pruning
+- **Safety Policies**: User/agent/tool policies with content filtering and guardrails
+- **Reliability Layers**: Verifier agents and quality improvement rounds
+- **Canvas Integration**: Visual interaction capabilities
+
+## Basic Usage
+
+### Simple Agent
+
+```python
+from upsonic import Agent, Task
+
+# Create a basic agent
+agent = Agent("openai/gpt-4o")
+
+# Execute a task
+task = Task("What is 1 + 1?")
+result = agent.do(task)
+print(result)  # Output: "2"
+```
+
+### Agent with Memory
+
+```python
+from upsonic import Agent, Task
+from upsonic.storage import InMemoryStorage, Memory
+
+# Create storage and memory
+storage = InMemoryStorage()
+memory = Memory(
+    storage=storage,
+    full_session_memory=True,
+    summary_memory=True
+)
+
+# Create agent with memory
+agent = Agent(
+    model="openai/gpt-4o",
+    name="Assistant",
+    memory=memory
+)
+
+# Multi-turn conversation
+agent.do(Task("My name is Alice"))
+agent.do(Task("What's my name?"))  # Remembers: "Your name is Alice"
+```
+
+## Initialization
+
+### Constructor Parameters
+
+```python
+Agent(
+    model: Union[str, Model] = "openai/gpt-4o",
+    *,
+    # Identity
+    name: Optional[str] = None,
+    role: Optional[str] = None,
+    goal: Optional[str] = None,
+    
+    # Memory
+    memory: Optional[Memory] = None,
+    db: Optional[DatabaseBase] = None,
+    
+    # Behavior
+    system_prompt: Optional[str] = None,
+    instructions: Optional[str] = None,
+    
+    # Tools
+    tools: Optional[list] = None,
+    enable_thinking_tool: bool = False,
+    
+    # Safety
+    user_policy: Optional[Union[Policy, List[Policy]]] = None,
+    agent_policy: Optional[Union[Policy, List[Policy]]] = None,
+    
+    # Context Management
+    context_management: bool = False,
+    context_management_keep_recent: int = 5,
+    
+    # Debug
+    debug: bool = False,
+    debug_level: int = 1,
+)
+```
+
+### Key Parameters
+
+<ParamField path="model" type="str | Model" default="openai/gpt-4o">
+  Model identifier (e.g., `"openai/gpt-4o"`, `"anthropic/claude-3-sonnet"`)
+</ParamField>
+
+<ParamField path="name" type="str">
+  Agent name for identification and logging
+</ParamField>
+
+<ParamField path="memory" type="Memory">
+  Memory instance for conversation history and session persistence
+</ParamField>
+
+<ParamField path="tools" type="list">
+  List of tools, ToolKits, MCP handlers, or other agents to register
+</ParamField>
+
+<ParamField path="system_prompt" type="str">
+  Custom system prompt to guide agent behavior
+</ParamField>
+
+<ParamField path="user_policy" type="Policy | List[Policy]">
+  Safety policies for user input validation
+</ParamField>
+
+<ParamField path="context_management" type="bool" default="false">
+  Enable automatic context window management and message pruning
+</ParamField>
+
+## Execution Methods
+
+### Synchronous Execution
+
+#### `do(task)`
+
+Execute a task synchronously and return the result.
+
+```python
+result = agent.do(task)
+print(result)  # String output
+```
+
+#### `print_do(task)`
+
+Execute and print output in real-time (streaming to console).
+
+```python
+agent.print_do(task)  # Prints as it generates
+```
+
+### Asynchronous Execution
+
+#### `do_async(task)`
+
+Execute a task asynchronously.
+
+```python
+import asyncio
+
+result = await agent.do_async(task)
+```
+
+#### `astream(task)`
+
+Stream the agent's response asynchronously.
+
+```python
+async for chunk in agent.astream(task):
+    print(chunk, end="", flush=True)
+```
+
+### Streaming Execution
+
+#### `stream(task)`
+
+Stream the agent's response synchronously.
+
+```python
+for chunk in agent.stream(task):
+    print(chunk, end="", flush=True)
+```
+
+## Working with Tools
+
+### Adding Tools
+
+Tools can be added during initialization or dynamically:
+
+```python
+from upsonic.tools import tool
+
+@tool
+def calculate(expression: str) -> float:
+    """Evaluate a mathematical expression."""
+    return eval(expression)
+
+# Add during initialization
+agent = Agent(
+    model="openai/gpt-4o",
+    tools=[calculate]
+)
+
+# Add dynamically
+agent.add_tools([calculate])
+```
+
+### MCP Tool Integration
+
+```python
+from upsonic.tools import MCPHandler
+
+# Connect to MCP server
+mcp = MCPHandler(
+    command="uvx mcp-server-sqlite --db-path ~/data.db"
+)
+
+# Add MCP tools to agent
+agent = Agent(
+    model="openai/gpt-4o",
+    tools=[mcp]
+)
+```
+
+### Using Other Agents as Tools
+
+```python
+# Create specialized agents
+research_agent = Agent(
+    model="openai/gpt-4o",
+    name="Researcher",
+    role="Research specialist"
+)
+
+writing_agent = Agent(
+    model="anthropic/claude-3-sonnet",
+    name="Writer",
+    role="Content writer"
+)
+
+# Coordinator agent with sub-agents as tools
+coordinator = Agent(
+    model="openai/gpt-4o",
+    name="Coordinator",
+    tools=[research_agent, writing_agent]
+)
+```
+
+## Safety and Guardrails
+
+### Input Validation
+
+```python
+from upsonic.safety_engine import PIIBlockPolicy
+
+agent = Agent(
+    model="openai/gpt-4o",
+    user_policy=PIIBlockPolicy()  # Block PII in user input
+)
+```
+
+### Output Filtering
+
+```python
+from upsonic.safety_engine import AdultContentBlockPolicy
+
+agent = Agent(
+    model="openai/gpt-4o",
+    agent_policy=AdultContentBlockPolicy()  # Filter agent output
+)
+```
+
+### Multiple Policies
+
+```python
+from upsonic.safety_engine import (
+    PIIBlockPolicy,
+    ProfanityBlockPolicy,
+    AdultContentBlockPolicy
+)
+
+agent = Agent(
+    model="openai/gpt-4o",
+    user_policy=[PIIBlockPolicy(), ProfanityBlockPolicy()],
+    agent_policy=[AdultContentBlockPolicy()]
+)
+```
+
+## Advanced Features
+
+### Context Management
+
+Automatic context window optimization:
+
+```python
+agent = Agent(
+    model="openai/gpt-4o",
+    memory=memory,
+    context_management=True,  # Enable auto-pruning
+    context_management_keep_recent=5  # Keep 5 recent messages
+)
+```
+
+### Thinking Tool (Planning & Execution)
+
+```python
+agent = Agent(
+    model="openai/gpt-4o",
+    enable_thinking_tool=True  # Enable plan_and_execute
+)
+
+# Agent can now break down complex tasks
+result = agent.do(Task(
+    "Research quantum computing and write a summary"
+))
+```
+
+### Response Format Control
+
+```python
+from pydantic import BaseModel
+
+class User(BaseModel):
+    name: str
+    age: int
+    email: str
+
+task = Task(
+    description="Extract user information",
+    response_format=User
+)
+
+result = agent.do(task)
+print(result.name, result.email)  # Structured output
+```
+
+### Workspace Integration
+
+```python
+agent = Agent(
+    model="openai/gpt-4o",
+    workspace="/path/to/project",  # Loads AGENTS.md
+)
+```
+
+## Run Output and Metadata
+
+### Accessing Run Details
+
+```python
+result = agent.do(task, return_output=True)
+
+# Access detailed run information
+print(result.run_id)
+print(result.status)  # RunStatus.completed
+print(result.usage)   # Token usage
+print(result.tool_call_count)
+```
+
+### Usage Tracking
+
+```python
+# Get usage for the last run
+run_output = agent.get_run_output()
+print(run_output.usage.total_tokens)
+print(run_output.usage.estimated_cost)
+
+# Get session-level usage
+session_usage = agent.get_session_usage()
+print(session_usage.total_tokens)
+print(session_usage.estimated_cost)
+```
+
+## Example: Complete Agent Setup
+
+```python
+from upsonic import Agent, Task
+from upsonic.storage import InMemoryStorage, Memory
+from upsonic.safety_engine import PIIBlockPolicy
+from upsonic.tools import tool
+
+@tool
+def search_web(query: str) -> str:
+    """Search the web for information."""
+    # Implementation here
+    return f"Results for: {query}"
+
+# Create storage and memory
+storage = InMemoryStorage()
+memory = Memory(
+    storage=storage,
+    full_session_memory=True,
+    summary_memory=True
+)
+
+# Create comprehensive agent
+agent = Agent(
+    model="openai/gpt-4o",
+    name="ResearchAssistant",
+    role="Research and analysis specialist",
+    goal="Help users find and analyze information",
+    memory=memory,
+    tools=[search_web],
+    enable_thinking_tool=True,
+    user_policy=PIIBlockPolicy(),
+    context_management=True,
+    debug=True
+)
+
+# Execute task
+task = Task("Research the latest AI trends")
+result = agent.do(task)
+print(result)
+```
+
+## See Also
+
+- [Task](/concepts/task) - Task definition and execution
+- [Tools](/concepts/tools) - Tool system and MCP integration
+- [Memory](/concepts/memory) - Memory management and persistence
+- [Safety Engine](/concepts/safety-engine) - Safety policies and guardrails
+- [Team](/concepts/team) - Multi-agent coordination

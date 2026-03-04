@@ -1,0 +1,782 @@
+---
+title: RAG Knowledge Base
+description: Building RAG systems, document loaders, and intelligent retrieval
+---
+
+# RAG Knowledge Base
+
+Learn how to build Retrieval-Augmented Generation (RAG) systems using Upsonic's KnowledgeBase. Enable your agents to access and retrieve information from documents, databases, and knowledge repositories.
+
+## KnowledgeBase Overview
+
+The `KnowledgeBase` class is the central orchestrator for RAG pipelines:
+
+- **Intelligent Document Processing**: Automatic loader and splitter detection
+- **Idempotent Operations**: Process documents once per configuration
+- **Async-First Architecture**: High-performance async operations
+- **Flexible Search**: Dense, full-text, and hybrid search
+- **Tool Integration**: Use as agent tools automatically
+- **Multiple Vector Databases**: Chroma, Qdrant, Milvus, PGVector, SuperMemory
+
+Reference: `src/upsonic/knowledge_base/knowledge_base.py:27-45`
+
+## Creating a Knowledge Base
+
+<Steps>
+  <Step title="Choose Vector Database">
+    Select and configure a vector database:
+
+    ```python
+    from upsonic.rag.vectordb import (
+        ChromaProvider,
+        QdrantProvider,
+        MilvusProvider,
+        PGVectorProvider
+    )
+    from upsonic.rag.vectordb.config import (
+        ChromaConfig,
+        QdrantConfig
+    )
+
+    # Chroma (local development)
+    chroma_config = ChromaConfig(
+        collection_name="my_docs",
+        persist_directory="./chroma_db"
+    )
+    vectordb = ChromaProvider(config=chroma_config)
+
+    # Qdrant (production)
+    qdrant_config = QdrantConfig(
+        collection_name="my_docs",
+        url="http://localhost:6333"
+    )
+    vectordb = QdrantProvider(config=qdrant_config)
+    ```
+  </Step>
+
+  <Step title="Configure Embeddings">
+    Choose an embedding provider:
+
+    ```python
+    from upsonic.rag.embeddings import (
+        OpenAIEmbedding,
+        CohereEmbedding,
+        VoyageEmbedding
+    )
+    from upsonic.rag.embeddings.config import OpenAIEmbeddingConfig
+
+    # OpenAI embeddings
+    embedding_config = OpenAIEmbeddingConfig(
+        model="text-embedding-3-large",
+        api_key="your_openai_key"
+    )
+    embeddings = OpenAIEmbedding(config=embedding_config)
+    ```
+  </Step>
+
+  <Step title="Create Knowledge Base">
+    Initialize with sources:
+
+    ```python
+    from upsonic.knowledge_base import KnowledgeBase
+
+    kb = KnowledgeBase(
+        sources=["./docs/", "./README.md"],
+        vectordb=vectordb,
+        embedding_provider=embeddings,
+        name="technical_docs",
+        description="Technical documentation for the project"
+    )
+
+    # Setup (idempotent - safe to call multiple times)
+    await kb.setup_async()
+    ```
+
+    Reference: `src/upsonic/knowledge_base/knowledge_base.py:47-156`
+  </Step>
+
+  <Step title="Query Knowledge Base">
+    Retrieve relevant information:
+
+    ```python
+    # Search for information
+    results = await kb.query_async(
+        query="How do I configure authentication?",
+        top_k=5
+    )
+
+    for result in results:
+        print(f"Score: {result.score}")
+        print(f"Text: {result.text}")
+        print(f"Source: {result.metadata['source']}")
+    ```
+  </Step>
+</Steps>
+
+## Document Sources
+
+### File Sources
+
+Support for various file formats:
+
+```python
+kb = KnowledgeBase(
+    sources=[
+        "./docs/guide.pdf",
+        "./README.md",
+        "./data/report.docx",
+        "./config.json"
+    ],
+    vectordb=vectordb,
+    embedding_provider=embeddings
+)
+```
+
+**Supported formats**: PDF, DOCX, TXT, MD, JSON, YAML, CSV, HTML, XML, and more
+
+### Directory Sources
+
+Recursively process directories:
+
+```python
+kb = KnowledgeBase(
+    sources=["./docs/"],  # Processes all supported files
+    vectordb=vectordb,
+    embedding_provider=embeddings
+)
+```
+
+Reference: `src/upsonic/knowledge_base/knowledge_base.py:383-396`
+
+### Direct Content
+
+Inline text content:
+
+```python
+kb = KnowledgeBase(
+    sources=[
+        "This is direct text content that will be processed.",
+        "Multiple strings can be provided as sources."
+    ],
+    vectordb=vectordb,
+    embedding_provider=embeddings
+)
+```
+
+Reference: `src/upsonic/knowledge_base/knowledge_base.py:547-617`
+
+### Mixed Sources
+
+Combine different source types:
+
+```python
+kb = KnowledgeBase(
+    sources=[
+        "./docs/",           # Directory
+        "./README.md",       # Single file
+        "Direct content..." # Inline text
+    ],
+    vectordb=vectordb,
+    embedding_provider=embeddings
+)
+```
+
+## Document Loaders
+
+Loaders extract content from different file formats:
+
+### Auto-Detection
+
+Loaders are automatically detected:
+
+```python
+kb = KnowledgeBase(
+    sources=["./docs/"],
+    vectordb=vectordb,
+    embedding_provider=embeddings
+    # Loaders auto-detected based on file types
+)
+```
+
+Reference: `src/upsonic/knowledge_base/knowledge_base.py:398-433`
+
+### Custom Loaders
+
+Provide specific loaders:
+
+```python
+from upsonic.rag.loaders import (
+    PDFLoader,
+    DOCXLoader,
+    MarkdownLoader
+)
+
+pdf_loader = PDFLoader()
+
+kb = KnowledgeBase(
+    sources=["./document.pdf"],
+    loaders=[pdf_loader],  # Custom loader
+    vectordb=vectordb,
+    embedding_provider=embeddings
+)
+```
+
+### Available Loaders
+
+```python
+from upsonic.rag.loaders import (
+    PDFLoader,           # PDF documents
+    PDFPlumberLoader,    # PDF with better table extraction
+    PyMuPDFLoader,       # PDF with images
+    DOCXLoader,          # Microsoft Word
+    TextLoader,          # Plain text files
+    MarkdownLoader,      # Markdown files
+    HTMLLoader,          # HTML documents
+    JSONLoader,          # JSON files
+    CSVLoader,           # CSV files
+    XMLLoader,           # XML documents
+    YAMLLoader,          # YAML files
+    DoclingLoader        # Advanced document parsing
+)
+```
+
+## Text Chunking
+
+Split documents into manageable chunks:
+
+### Auto-Detection
+
+Chunkers are automatically selected:
+
+```python
+kb = KnowledgeBase(
+    sources=["./docs/"],
+    vectordb=vectordb,
+    embedding_provider=embeddings,
+    use_case="rag_retrieval",        # Optimize for RAG
+    quality_preference="balanced"     # Speed vs quality
+    # Chunkers auto-detected
+)
+```
+
+Reference: `src/upsonic/knowledge_base/knowledge_base.py:435-481`
+
+### Chunking Strategies
+
+```python
+from upsonic.rag.text_splitter import (
+    RecursiveChunker,
+    CharacterChunker,
+    SemanticChunker,
+    PythonChunker,
+    MarkdownHeaderChunker,
+    HTMLChunker,
+    JSONChunker,
+    AgenticChunker
+)
+
+# Recursive chunking (default)
+recursive = RecursiveChunker(
+    chunk_size=1000,
+    chunk_overlap=200
+)
+
+# Semantic chunking (content-aware)
+semantic = SemanticChunker(
+    embedding_provider=embeddings,
+    buffer_size=1
+)
+
+# Python code chunking
+python = PythonChunker(
+    chunk_size=1500,
+    chunk_overlap=200
+)
+
+kb = KnowledgeBase(
+    sources=["./code/"],
+    splitters=[python],  # Custom chunker
+    vectordb=vectordb,
+    embedding_provider=embeddings
+)
+```
+
+### Chunking Configuration
+
+```python
+kb = KnowledgeBase(
+    sources=["./docs/"],
+    vectordb=vectordb,
+    embedding_provider=embeddings,
+    splitter_config={
+        "chunk_size": 800,
+        "chunk_overlap": 150,
+        "length_function": len
+    }
+)
+```
+
+## Search Methods
+
+### Dense Vector Search
+
+Semantic similarity search:
+
+```python
+results = await kb.query_async(
+    query="What is machine learning?",
+    top_k=5,
+    search_type="dense"
+)
+```
+
+### Full-Text Search
+
+Keyword-based search:
+
+```python
+results = await kb.query_async(
+    query="authentication configuration",
+    top_k=5,
+    search_type="full_text"
+)
+```
+
+### Hybrid Search
+
+Combined semantic + keyword:
+
+```python
+results = await kb.query_async(
+    query="How to setup OAuth2?",
+    top_k=5,
+    search_type="hybrid",
+    alpha=0.7  # 0.7 semantic, 0.3 keyword
+)
+```
+
+Reference: `src/upsonic/knowledge_base/knowledge_base.py:1054-1151`
+
+### Metadata Filtering
+
+Filter by document metadata:
+
+```python
+results = await kb.query_async(
+    query="API endpoints",
+    top_k=5,
+    filter={
+        "source": "api_docs.md",
+        "version": "2.0"
+    }
+)
+```
+
+## Using with Agents
+
+### As a Tool
+
+KnowledgeBase automatically becomes a searchable tool:
+
+```python
+from upsonic import Agent, Task
+from upsonic.knowledge_base import KnowledgeBase
+
+# Create knowledge base
+kb = KnowledgeBase(
+    sources=["./docs/"],
+    vectordb=vectordb,
+    embedding_provider=embeddings,
+    name="product_docs",
+    description="Product documentation and guides"
+)
+await kb.setup_async()
+
+# Agent can use it as a tool
+agent = Agent(
+    model="openai/gpt-4o",
+    tools=[kb]  # KnowledgeBase acts as a tool
+)
+
+# Agent automatically searches when needed
+result = agent.do(
+    Task("How do I configure the database?")
+)
+```
+
+Reference: `src/upsonic/knowledge_base/knowledge_base.py:149-255`
+
+### Dynamic Tool Names
+
+Each KnowledgeBase gets a unique tool name:
+
+```python
+# Multiple knowledge bases
+technical_kb = KnowledgeBase(
+    name="technical_docs",
+    sources=["./technical/"],
+    vectordb=vectordb1,
+    embedding_provider=embeddings
+)
+
+user_kb = KnowledgeBase(
+    name="user_guides",
+    sources=["./guides/"],
+    vectordb=vectordb2,
+    embedding_provider=embeddings
+)
+
+# Agent gets both as tools:
+# - search_technical_docs(query: str)
+# - search_user_guides(query: str)
+agent = Agent(
+    model="openai/gpt-4o",
+    tools=[technical_kb, user_kb]
+)
+```
+
+Reference: `src/upsonic/knowledge_base/knowledge_base.py:180-255`
+
+### Task-Level Configuration
+
+Configure search per task:
+
+```python
+from upsonic import Task
+
+task = Task(
+    description="Find information about authentication",
+    vector_search_top_k=10,
+    vector_search_alpha=0.8,
+    vector_search_filter={"category": "security"},
+    vector_search_similarity_threshold=0.7
+)
+
+result = agent.do(task)
+```
+
+## Advanced Features
+
+### Idempotent Processing
+
+Documents are processed only once:
+
+```python
+# First run: processes and indexes documents
+await kb.setup_async()
+
+# Subsequent runs: skips processing (already indexed)
+await kb.setup_async()  # Instant
+await kb.setup_async()  # Instant
+```
+
+Reference: `src/upsonic/knowledge_base/knowledge_base.py:672-781`
+
+### Health Checks
+
+Monitor knowledge base status:
+
+```python
+# Check if ready
+if kb._is_ready:
+    print("Knowledge base ready")
+
+# Get processing stats
+stats = kb._processing_stats
+print(f"Documents: {stats['documents_count']}")
+print(f"Chunks: {stats['chunks_count']}")
+print(f"Indexed at: {stats['indexed_at']}")
+```
+
+### Custom Topics
+
+Organize knowledge by topics:
+
+```python
+kb = KnowledgeBase(
+    sources=["./docs/"],
+    vectordb=vectordb,
+    embedding_provider=embeddings,
+    name="api_docs",
+    description="API documentation",
+    topics=["REST API", "GraphQL", "Authentication", "Rate Limiting"]
+)
+```
+
+## Vector Database Options
+
+### Chroma
+
+Local vector database:
+
+```python
+from upsonic.rag.vectordb import ChromaProvider
+from upsonic.rag.vectordb.config import ChromaConfig
+
+config = ChromaConfig(
+    collection_name="my_docs",
+    persist_directory="./chroma_db",
+    distance_metric="cosine"
+)
+
+vectordb = ChromaProvider(config=config)
+```
+
+**Use for**: Development, local testing, small datasets
+
+### Qdrant
+
+Scalable vector search:
+
+```python
+from upsonic.rag.vectordb import QdrantProvider
+from upsonic.rag.vectordb.config import QdrantConfig
+
+config = QdrantConfig(
+    collection_name="my_docs",
+    url="http://localhost:6333",
+    api_key="your_api_key",
+    vector_size=1536,
+    distance_metric="Cosine"
+)
+
+vectordb = QdrantProvider(config=config)
+```
+
+**Use for**: Production, large-scale applications
+
+### Milvus
+
+Distributed vector database:
+
+```python
+from upsonic.rag.vectordb import MilvusProvider
+from upsonic.rag.vectordb.config import MilvusConfig
+
+config = MilvusConfig(
+    collection_name="my_docs",
+    host="localhost",
+    port=19530,
+    vector_size=1536
+)
+
+vectordb = MilvusProvider(config=config)
+```
+
+**Use for**: Enterprise, very large datasets
+
+### PGVector
+
+PostgreSQL extension:
+
+```python
+from upsonic.rag.vectordb import PGVectorProvider
+from upsonic.rag.vectordb.config import PGVectorConfig
+
+config = PGVectorConfig(
+    collection_name="my_docs",
+    connection_string="postgresql://user:pass@localhost/db",
+    vector_size=1536
+)
+
+vectordb = PGVectorProvider(config=config)
+```
+
+**Use for**: PostgreSQL users, integrated solutions
+
+### SuperMemory
+
+Managed RAG platform:
+
+```python
+from upsonic.rag.vectordb import SuperMemoryProvider
+from upsonic.rag.vectordb.config import SuperMemoryConfig
+
+config = SuperMemoryConfig(
+    collection_name="my_docs",
+    api_key="your_supermemory_key",
+    base_url="https://api.supermemory.ai"
+)
+
+vectordb = SuperMemoryProvider(config=config)
+```
+
+**Use for**: Managed service, minimal setup
+
+## Best Practices
+
+<Tip>
+**Chunk Size**: Choose appropriate chunk sizes:
+
+- **Small chunks (200-500 tokens)**: Better precision, more chunks
+- **Medium chunks (500-1000 tokens)**: Balanced
+- **Large chunks (1000-2000 tokens)**: More context, fewer chunks
+
+```python
+kb = KnowledgeBase(
+    sources=["./docs/"],
+    vectordb=vectordb,
+    embedding_provider=embeddings,
+    splitter_config={
+        "chunk_size": 800,  # Balanced size
+        "chunk_overlap": 150  # 15-20% overlap
+    }
+)
+```
+</Tip>
+
+<Tip>
+**Quality Preference**: Set based on your needs:
+
+```python
+# Fast processing, good enough quality
+kb = KnowledgeBase(
+    sources=["./docs/"],
+    vectordb=vectordb,
+    embedding_provider=embeddings,
+    quality_preference="fast"
+)
+
+# Best quality, slower processing
+kb = KnowledgeBase(
+    sources=["./docs/"],
+    vectordb=vectordb,
+    embedding_provider=embeddings,
+    quality_preference="quality"
+)
+```
+</Tip>
+
+<Warning>
+**Embedding Costs**: Be mindful of embedding API costs:
+
+- Use smaller, cheaper embedding models for development
+- Cache embeddings when possible
+- Monitor usage in production
+
+```python
+# Development: cheaper model
+dev_embeddings = OpenAIEmbedding(
+    config=OpenAIEmbeddingConfig(
+        model="text-embedding-3-small"
+    )
+)
+
+# Production: better quality
+prod_embeddings = OpenAIEmbedding(
+    config=OpenAIEmbeddingConfig(
+        model="text-embedding-3-large"
+    )
+)
+```
+</Warning>
+
+<Tip>
+**Metadata Strategy**: Add useful metadata for filtering:
+
+```python
+# Loaders can add custom metadata
+loader = PDFLoader()
+loader.metadata_extractor = lambda doc: {
+    "category": extract_category(doc),
+    "version": extract_version(doc),
+    "author": extract_author(doc)
+}
+```
+</Tip>
+
+<Note>
+**Async Operations**: Always use async for better performance:
+
+```python
+# Good: Async
+await kb.setup_async()
+results = await kb.query_async(query)
+
+# Acceptable: Sync wrapper (uses async internally)
+results = kb.query(query)  # Calls query_async internally
+```
+</Note>
+
+## Common Patterns
+
+### Documentation Assistant
+
+```python
+# Index documentation
+kb = KnowledgeBase(
+    sources=["./docs/", "./README.md"],
+    vectordb=vectordb,
+    embedding_provider=embeddings,
+    name="docs",
+    description="Product documentation",
+    topics=["Getting Started", "API Reference", "Tutorials"]
+)
+await kb.setup_async()
+
+# Create assistant
+assistant = Agent(
+    model="openai/gpt-4o",
+    name="Documentation Assistant",
+    role="Help users understand the product",
+    tools=[kb],
+    system_prompt="Use the documentation to answer questions accurately."
+)
+```
+
+### Code Search
+
+```python
+from upsonic.rag.text_splitter import PythonChunker
+
+# Index Python codebase
+kb = KnowledgeBase(
+    sources=["./src/"],
+    vectordb=vectordb,
+    embedding_provider=embeddings,
+    splitters=[PythonChunker(chunk_size=1500)],
+    name="codebase",
+    description="Python source code"
+)
+await kb.setup_async()
+
+# Code search agent
+code_agent = Agent(
+    model="openai/gpt-4o",
+    tools=[kb],
+    system_prompt="Help developers find code examples and understand the codebase."
+)
+```
+
+### Multi-Source RAG
+
+```python
+# Multiple knowledge bases
+internal_kb = KnowledgeBase(
+    name="internal_docs",
+    sources=["./internal/"],
+    vectordb=vectordb1,
+    embedding_provider=embeddings
+)
+
+public_kb = KnowledgeBase(
+    name="public_docs",
+    sources=["./public/"],
+    vectordb=vectordb2,
+    embedding_provider=embeddings
+)
+
+# Agent with multiple sources
+agent = Agent(
+    model="openai/gpt-4o",
+    tools=[internal_kb, public_kb],
+    system_prompt="Search both internal and public documentation."
+)
+```
+
+## Next Steps
+
+- [Document Processing](/guides/document-processing) - Advanced document handling
+- [Custom Tools](/guides/custom-tools) - Build custom knowledge tools
+- [Building Agents](/guides/building-agents) - Use RAG with agents
+- [Memory Management](/guides/memory-management) - Combine RAG with memory
